@@ -3,6 +3,7 @@ import java.io.*;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 public class DiskEmulator {
     private File file;
@@ -12,48 +13,72 @@ public class DiskEmulator {
     private short spt_number;
     private short tph_number;
     private short head_number;
-    static final String extensionName=".fdsk";
+    static final String extensionName="fdskfile";
 
-    DiskEmulator() {
+    public DiskEmulator() {
         binded=false;
     }
-    DiskEmulator(String filepath) {
+    public DiskEmulator(String filepath) throws IOException{
         binded=false;
         bindDiskFile(filepath);
     }
-    void bindDiskFile(String filepath) throws IOException {
+    public void bindDiskFile(String filepath) throws IOException {
         file=new File(filepath);
         if (!file.isFile()) throw new IOException("File does not exists");
         filestream=new RandomAccessFile(file,"r");
         filestream.seek(8);
-        if (!filestream.readUTF().equals(extensionName)) throw new IOException("File format error");
+        String format="";
+        try {
+            for (int i=8;i<(extensionName.length()+8);i++) {
+                format=format+(char) filestream.readByte();
+            }
+        } catch (EOFException e) {
+            throw new IOException("disk file format error");
+        }
+
+        if (!format.equals(extensionName)) throw new IOException("disk file format error");
         filestream.seek(0);
         head_number=filestream.readShort();
         tph_number= filestream.readShort();
         spt_number=filestream.readShort();
         sector_dimension=filestream.readShort();
+        filestream.close();
     }
-    boolean createDiskFile(String filepath, short sector_dimension, short spt_number, short tph_number, short head_number) throws IOException {
-        sector_dimension= (short) (sector_dimension*128);
-        int point=0;
-        while (point<filepath.length() && filepath.charAt(point)!='.') point=point+1;
-        if (point<(filepath.length()-1)) filepath=filepath.substring(0,point);
-        filepath=filepath+extensionName;
+    public void createDiskFile(String filepath, short sector_dimension, short spt_number, short tph_number, short head_number) throws IOException {
         file=new File(filepath);
         if (!file.createNewFile()) throw new IOException("File already exists");
         filestream=new RandomAccessFile(file,"rw");
-        filestream.setLength((long) sector_dimension *spt_number*tph_number*head_number);
+        filestream.setLength(((long) sector_dimension *spt_number*tph_number*head_number)+16);
         filestream.seek(0);
         filestream.writeShort(head_number);
         filestream.writeShort(tph_number);
         filestream.writeShort(spt_number);
         filestream.writeShort(sector_dimension);
-        filestream.writeUTF(extensionName.substring(1,(extensionName.length()-1));
+        filestream.writeBytes(extensionName);
         this.head_number=head_number;
         this.sector_dimension=sector_dimension;
         this.spt_number=spt_number;
         this.tph_number=tph_number;
         filestream.close();
         binded=true;
+    }
+    public byte[] readDiskSector(short head, short track, short sector) throws IOException {
+        if (!binded) throw new IOException("File not binded");
+        if (head>=head_number || track>=tph_number || sector>=spt_number) throw new IOException("Sector out of bound");
+        filestream=new RandomAccessFile(file,"r");
+        byte[] sectorData=new byte[sector_dimension];
+        filestream=new RandomAccessFile(file,"r");
+        filestream.seek((sector_dimension*sector)+(track*spt_number)+(head*tph_number*spt_number)+16);
+        filestream.read(sectorData);
+        filestream.close();
+        return sectorData;
+    }
+    public void writeDiskSector(byte[] sector_data,short head, short track, short sector) throws IOException {
+        if (!binded) throw new IOException("File not binded");
+        if (head>=head_number || track>=tph_number || sector>=spt_number) throw new IOException("Sector out of bound");
+        filestream=new RandomAccessFile(file,"rw");
+        filestream.seek((sector_dimension*sector)+(track*spt_number)+(head*tph_number*spt_number)+16);
+        filestream.write(sector_data);
+        filestream.close();
     }
 }

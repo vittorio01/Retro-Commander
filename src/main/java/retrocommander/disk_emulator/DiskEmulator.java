@@ -1,9 +1,5 @@
-package disk_emulator;
+package retrocommander.disk_emulator;
 import java.io.*;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
 
 public class DiskEmulator {
     private File file;
@@ -44,10 +40,10 @@ public class DiskEmulator {
         sector_dimension=filestream.readShort();
         filestream.close();
     }
-    public void createDiskFile(String filepath, short sector_dimension, short spt_number, short tph_number, short head_number) throws IOException {
-        file=new File(filepath);
+    public static void createDiskFile(String filepath, short sector_dimension, short spt_number, short tph_number, short head_number) throws IOException {
+        File file=new File(filepath);
         if (!file.createNewFile()) throw new IOException("File already exists");
-        filestream=new RandomAccessFile(file,"rw");
+        RandomAccessFile filestream=new RandomAccessFile(file,"rw");
         filestream.setLength(((long) sector_dimension *spt_number*tph_number*head_number)+16);
         filestream.seek(0);
         filestream.writeShort(head_number);
@@ -55,12 +51,7 @@ public class DiskEmulator {
         filestream.writeShort(spt_number);
         filestream.writeShort(sector_dimension);
         filestream.writeBytes(extensionName);
-        this.head_number=head_number;
-        this.sector_dimension=sector_dimension;
-        this.spt_number=spt_number;
-        this.tph_number=tph_number;
         filestream.close();
-        binded=true;
     }
     public byte[] readDiskSector(short head, short track, short sector) throws IOException {
         if (!binded) throw new IOException("File not binded");
@@ -80,5 +71,20 @@ public class DiskEmulator {
         filestream.seek((sector_dimension*sector)+(track*spt_number)+(head*tph_number*spt_number)+16);
         filestream.write(sector_data);
         filestream.close();
+    }
+    public short getSectorDimension() {
+        return sector_dimension;
+    }
+    public short getTph() {
+        return tph_number;
+    }
+    public short getSpt() {
+        return spt_number;
+    }
+    public short getHeadNumber() {
+        return head_number;
+    }
+    public boolean isReadOnly() {
+        return file.canWrite();
     }
 }

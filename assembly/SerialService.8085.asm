@@ -38,8 +38,7 @@ serial_command_get_disk_informations_byte       .equ $01
 serial_command_write_disk_sector_byte           .equ $02
 serial_command_read_disk_sector_byte            .equ $03 
 
-device_boardId          .text   "PX-MINI 1"
-                        .b 0 
+
 ;contains the count state of the two serial lines 
 ; bit 8 -> send count 
 ; bit 7 -> receive count   
@@ -402,3 +401,6 @@ serial_configure:   xra a
                     out serial_command_port	
                     in serial_data_port	
                     ret 
+
+device_boardId          .text   "PX-MINI 1"
+                        .b 0 

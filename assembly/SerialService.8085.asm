@@ -1,15 +1,15 @@
 
-start_address   .equ $0000 
+start_address   .equ $8000 
 
-serial_data_port        .equ $00
-serial_command_port     .equ $01 
-serial_port_settings    .equ $00
+serial_data_port        .equ %00100110
+serial_command_port     .equ %00100111
+serial_port_settings    .equ %01001101
 
 serial_state_input_line_mask    .equ %00000001
 serial_state_output_line_mask   .equ %00000010
 
-serial_delay_value              .equ $0a
-serial_wait_timeout_value       .equ 10
+serial_delay_value              .equ $86
+serial_wait_timeout_value       .equ 10000
 
 serial_packet_start_packet_byte         .equ $AA 
 serial_packet_stop_packet_byte          .equ $f0 

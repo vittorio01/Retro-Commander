@@ -47,6 +47,7 @@ serial_packet_count_state_receive       .equ %01000000
 
 start:  .org start_address 
         lxi sp,$0300
+        call serial_line_initialize
         mvi b,15
         lxi h,serial_message 
 loop:   mov a,m 

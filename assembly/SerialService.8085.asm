@@ -48,25 +48,13 @@ serial_packet_count_state_receive       .equ %01000000
 start:  .org start_address 
         lxi sp,$7fff
         call serial_line_initialize
-        mvi b,15
-        lxi h,serial_message 
-loop:   mov a,m 
-        call serial_send_new_byte
-        inx h 
-        dcr b 
-        jnz loop
         mvi a,$c0 
         sim  
-loop2:  call serial_wait_new_byte
-        call serial_send_new_byte 
-        jmp loop2
-
-        ;call serial_open_connection
-        ;call serial_send_boardId
-        ;call serial_close_connection
+        call serial_open_connection
+        call serial_send_boardId
+        call serial_close_connection
         hlt 
 
-serial_message: .text "TEST8085 SERIAL"
 
 ;serial_open_connection sends an open request to the slave 
 ;Cy -> 1 operation ok, 0 error during transmission 

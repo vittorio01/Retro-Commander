@@ -5,8 +5,8 @@ serial_data_port        .equ %00100110
 serial_command_port     .equ %00100111
 serial_port_settings    .equ %01001101
 
-serial_state_input_line_mask    .equ %00000001
-serial_state_output_line_mask   .equ %00000010
+serial_state_input_line_mask    .equ %00000010
+serial_state_output_line_mask   .equ %00000001
 
 serial_delay_value              .equ $86
 serial_wait_timeout_value       .equ 10000
@@ -46,15 +46,17 @@ serial_packet_count_state_send          .equ %10000000
 serial_packet_count_state_receive       .equ %01000000
 
 start:  .org start_address 
-        lxi sp,$0300
+        lxi sp,$7fff
         call serial_line_initialize
         mvi b,15
         lxi h,serial_message 
 loop:   mov a,m 
-        inx h 
         call serial_send_new_byte
+        inx h 
         dcr b 
-        jnz loop 
+        jnz loop
+        mvi a,$c0 
+        sim  
 loop2:  call serial_wait_new_byte
         call serial_send_new_byte 
         jmp loop2

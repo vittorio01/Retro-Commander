@@ -46,7 +46,9 @@ serial_command_read_disk_sector_byte            .equ $03
 serial_packet_count_state_send          .equ %10000000
 serial_packet_count_state_receive       .equ %01000000
 
-start:  .org start_address 
+begin:  .org start_address
+        jmp start
+start:  nop
         lxi sp,$7fff
         mvi a,$c0 
         sim  

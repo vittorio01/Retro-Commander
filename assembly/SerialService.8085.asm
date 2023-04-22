@@ -8,7 +8,7 @@ serial_port_settings    .equ %01001101
 serial_state_input_line_mask    .equ %00000010
 serial_state_output_line_mask   .equ %00000001
 
-serial_delay_value              .equ 32                 ;delay constant for byte wait functions 
+serial_delay_value              .equ 16                 ;delay constant for byte wait functions 
                                                         ;serial_delay_value=(clk-31)/74 
 serial_wait_timeout_value       .equ 5000               ;resend timeout value (millis)
 
@@ -65,6 +65,7 @@ serial_open_connection:         push h
                                 mvi a,serial_command_open_connection_byte  
                                 sta serial_packet_buffer
                                 mvi a,serial_packet_control_channel_value+$01 
+                                lxi h,serial_packet_buffer 
                                 call serial_send_packet
                                 pop h 
                                 ret 
@@ -75,6 +76,7 @@ serial_close_connection:        push h
                                 mvi a,serial_command_close_connection_byte  
                                 sta serial_packet_buffer
                                 mvi a,serial_packet_control_channel_value+$01 
+                                lxi h,serial_packet_buffer
                                 call serial_send_packet
                                 pop h 
                                 ret 
@@ -242,10 +244,12 @@ serial_send_packet_checksum:    mov a,m
                                 inx h 
                                 dcr d 
                                 jnz serial_send_packet_checksum
-                                mov a,c 
+serial_send_packet_start_send:  mov a,c 
                                 ani serial_packet_dimension_mask        
                                 mov d,a 
-serial_send_packet_start_send:  mvi a,serial_packet_start_packet_byte
+                                pop h 
+                                push h 
+                                mvi a,serial_packet_start_packet_byte
                                 call serial_send_new_byte
                                 mov a,c 
                                 call serial_send_new_byte
@@ -254,21 +258,20 @@ serial_send_packet_start_send:  mvi a,serial_packet_start_packet_byte
                                 mov a,d 
                                 ora a 
                                 jz serial_send_packet_send_stop
-                                pop h 
-                                push h 
 serial_send_packet_data:        mov a,m 
                                 call serial_send_new_byte
                                 inx h 
-                                dcr d 
+                                dcr d
                                 jnz serial_send_packet_data
 serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
                                 call serial_send_new_byte
+        
                                 mov a,c 
                                 ani serial_packet_acknowledge_bit_mask
                                 jnz serial_send_packet_ok
                                 call serial_listen_new_byte
                                 jc serial_send_packet_ack_check
-                                dcr d 
+                                dcr b
                                 jnz serial_send_packet_start_send
                                 stc 
                                 cmc 
@@ -286,7 +289,7 @@ serial_send_packet_ack_check:   lxi h,$ffff-serial_packet_max_dimension+1
                                 ani serial_packet_channel_bit_mask
                                 cmp l 
                                 jz serial_send_packet_ok
-                                dcr d 
+                                dcr b
                                 jnz serial_send_packet_start_send
                                 stc 
                                 cmc 

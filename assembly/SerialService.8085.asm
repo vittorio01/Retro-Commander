@@ -8,8 +8,9 @@ serial_port_settings    .equ %01001101
 serial_state_input_line_mask    .equ %00000010
 serial_state_output_line_mask   .equ %00000001
 
-serial_delay_value              .equ $86
-serial_wait_timeout_value       .equ 10000
+serial_delay_value              .equ 32                 ;delay constant for byte wait functions 
+                                                        ;serial_delay_value=(clk-31)/74 
+serial_wait_timeout_value       .equ 5000               ;resend timeout value (millis)
 
 serial_packet_start_packet_byte         .equ $AA 
 serial_packet_stop_packet_byte          .equ $f0 
@@ -47,9 +48,9 @@ serial_packet_count_state_receive       .equ %01000000
 
 start:  .org start_address 
         lxi sp,$7fff
-        call serial_line_initialize
         mvi a,$c0 
         sim  
+        call serial_line_initialize
         call serial_open_connection
         call serial_send_boardId
         call serial_close_connection
@@ -301,16 +302,16 @@ serial_send_packet_end:         pop h
 serial_wait_timeout_new_byte:                   push b 
                                                 push d 
                                                 lxi d,serial_wait_timeout_value
-serial_wait_Timeout_new_byte_value_reset:       mvi b,serial_delay_value 
-serial_wait_timeout_new_byte_value_check:       call serial_get_input_state
-                                                ora a 
-                                                jnz serial_wait_timeout_new_byte_received 
-                                                dcr b 
-                                                jnz serial_wait_timeout_new_byte_value_check
-                                                dcx d 
-                                                mov a,e 
-                                                ora d 
-                                                jnz serial_wait_Timeout_new_byte_value_reset
+serial_wait_Timeout_new_byte_value_reset:       mvi b,serial_delay_value                        ;7      
+serial_wait_timeout_new_byte_value_check:       call serial_get_input_state                     ;17     ---
+                                                ora a                                           ;4
+                                                jnz serial_wait_timeout_new_byte_received       ;10
+                                                dcr b                                           ;5
+                                                jnz serial_wait_timeout_new_byte_value_check    ;10     --> 74
+                                                dcx d                                           ;5
+                                                mov a,e                                         ;5
+                                                ora d                                           ;4
+                                                jnz serial_wait_Timeout_new_byte_value_reset    ;10
                                                 xra a
                                                 stc 
                                                 cmc 
@@ -320,6 +321,7 @@ serial_wait_timeout_new_byte_received:          call serial_get_byte
 serial_wait_timeout_new_byte_end:               pop d 
                                                 pop b 
                                                 ret 
+
 
 ;serial_listen_new_byte wait until a new byte is received on the serial line
 ;Cy -> 0 if timeout, 1 byte received
@@ -367,9 +369,9 @@ serial_send_new_byte_wait:  call serial_get_output_state
 
 ;serial_get_input_state returns the state of the serial device input line
 ;A <- $ff if there is an incoming byte, $00 otherwise 
-serial_get_input_state:     in serial_command_port
-                            ani serial_state_input_line_mask 
-                            rz 
+serial_get_input_state:     in serial_command_port                      ;10
+                            ani serial_state_input_line_mask            ;7
+                            rz                                          ;11
                             mvi a,$ff 
                             ret 
 

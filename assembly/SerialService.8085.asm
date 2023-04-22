@@ -242,8 +242,6 @@ serial_send_packet_checksum:    mov a,m
                                 inx h 
                                 dcr d 
                                 jnz serial_send_packet_checksum
-                                pop h 
-                                push h 
                                 mov a,c 
                                 ani serial_packet_dimension_mask        
                                 mov d,a 
@@ -256,6 +254,8 @@ serial_send_packet_start_send:  mvi a,serial_packet_start_packet_byte
                                 mov a,d 
                                 ora a 
                                 jz serial_send_packet_send_stop
+                                pop h 
+                                push h 
 serial_send_packet_data:        mov a,m 
                                 call serial_send_new_byte
                                 inx h 

@@ -1,3 +1,14 @@
+;packet structure
+
+;- 0xAA - header - command - checksum - data (may be obmitted) - 0xf0 - 
+
+; command ->    a byte which identifies the action that the slave must execute 
+; header  ->    bit 7 -> ACK
+;               bit 6 -> COUNT 
+;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
+; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,checksum, start and stop bytes) 
+
+
 
 start_address   .equ $8000 
 
@@ -14,15 +25,12 @@ serial_wait_timeout_value       .equ 5000               ;resend timeout value (m
 
 serial_packet_start_packet_byte         .equ $AA 
 serial_packet_stop_packet_byte          .equ $f0 
-serial_packet_dimension_mask            .equ $0f 
-serial_packet_max_dimension             .equ $0f
+serial_packet_dimension_mask            .equ %00111111
+serial_packet_max_dimension             .equ 64
 
 serial_packet_acknowledge_bit_mask      .equ %10000000
-serial_packet_channel_bit_mask          .equ %01100000
-serial_packet_count_bit_mask            .equ %00010000
-serial_packet_terminal_channel_value    .equ %01000000
-serial_packet_control_channel_value     .equ %00000000
-serial_packet_disk_channel_value        .equ %00100000
+serial_packet_count_bit_mask            .equ %01000000
+
 serial_packet_resend_attempts           .equ 3 
 
 serial_packet_buffer            .equ    $0200 
@@ -61,33 +69,30 @@ start:  nop
 
 ;serial_open_connection sends an open request to the slave 
 ;Cy -> 1 operation ok, 0 error during transmission 
-serial_open_connection:         push h 
-                                mvi a,serial_command_open_connection_byte  
-                                sta serial_packet_buffer
-                                mvi a,serial_packet_control_channel_value+$01 
-                                lxi h,serial_packet_buffer 
+serial_open_connection:         push b
+                                mvi b,serial_command_open_connection_byte  
+                                mvi c,0
                                 call serial_send_packet
-                                pop h 
+                                pop b
                                 ret 
 
 ;serial_close_connection sends a close request to the slave 
 ;Cy -> 1 operation ok, 0 error during transmission 
-serial_close_connection:        push h 
-                                mvi a,serial_command_close_connection_byte  
-                                sta serial_packet_buffer
-                                mvi a,serial_packet_control_channel_value+$01 
-                                lxi h,serial_packet_buffer
+serial_close_connection:        push b
+                                mvi b,serial_command_close_connection_byte  
+                                mvi c,0
                                 call serial_send_packet
-                                pop h 
+                                pop b
                                 ret 
 
 ;serial_open_connection sends the boardId to the slave 
 ;Cy -> 1 operation ok, 0 error during transmission 
 serial_send_boardId:            push h 
                                 push d 
-                                mvi a,serial_command_send_identifier_byte
-                                sta serial_packet_buffer
-                                lxi h,serial_packet_buffer+1 
+                                push b 
+                                mvi b,serial_command_send_identifier_byte
+                                mvi c,0
+                                lxi h,serial_packet_buffer
                                 lxi d,device_boardId
 serial_send_boardId_copy:       ldax d  
                                 ora a 
@@ -99,22 +104,26 @@ serial_send_boardId_copy:       ldax d
 serial_send_boardId_copy_end:   lxi d,serial_packet_buffer 
                                 mov a,l 
                                 sub e 
-                                inr a 
+                                ani serial_packet_dimension_mask
+                                mov c,a 
                                 xchg 
-                                ori serial_packet_control_channel_value
                                 call serial_send_packet
                                 pop h 
+                                pop d 
+                                pop b 
                                 ret 
 
 ;serial_send_terminal_char sends a terminal char to the slave 
 ;A -> char to send 
 
 serial_send_terminal_char:      push h 
+                                push b 
                                 lxi h,serial_packet_buffer
-                                mvi m,serial_command_send_terminal_char_byte
-                                sta serial_packet_buffer+1
-                                mvi a,serial_packet_terminal_channel_value+2
+                                mov m,a 
+                                mvi b,serial_command_send_terminal_char_byte
+                                mvi c,1
                                 call serial_send_packet
+                                pop b 
                                 pop h 
                                 ret 
 
@@ -122,17 +131,15 @@ serial_send_terminal_char:      push h
 ;A <- char received 
 
 serial_request_terminal_char:           push h 
+                                        push b 
 serial_request_terminal_char_loop:      lxi h,serial_packet_buffer
-                                        mvi m,serial_command_request_terminal_char_byte
-                                        mvi a,1 
-                                        sta serial_packet_buffer+1
-                                        mvi a,serial_packet_terminal_channel_value+2
+                                        mvi b,serial_command_request_terminal_char_byte
+                                        mvi c,0
                                         call serial_send_packet 
                                         lxi h,serial_packet_buffer 
                                         call serial_get_packet
-                                        ani serial_packet_dimension_mask
-                                        jz serial_request_terminal_char_loop
                                         mov a,m 
+                                        pop b 
                                         pop h 
                                         ret 
 
@@ -147,13 +154,15 @@ serial_line_initialize: call serial_configure
 ;The function will block the normal execution program until it hasn't received a valid packet
 ;HL -> buffer address
 
-;A <- header 
+;C <- header 
+;B <- command
 
-serial_get_packet:              push b 
-                                push d 
+serial_get_packet:              push d 
                                 push h 
                                 lxi b,0 
-serial_get_packet_wait:         call serial_wait_new_byte
+serial_get_packet_wait:         pop h 
+                                push h 
+                                call serial_wait_new_byte
                                 cpi serial_packet_start_packet_byte
                                 jnz serial_get_packet_wait
                                 call serial_wait_timeout_new_byte
@@ -161,6 +170,9 @@ serial_get_packet_wait:         call serial_wait_new_byte
                                 mov e,a                                 ;E <- header 
                                 call serial_wait_timeout_new_byte       
                                 jnc serial_get_packet_wait      
+                                mov b,a                                 ;B <- command
+                                call serial_wait_timeout_new_byte 
+                                jnc serial_get_packet_wait
                                 mov d,a                                 ;D <- checksum
                                 mov a,e 
                                 ani serial_packet_dimension_mask   
@@ -178,26 +190,33 @@ serial_get_packet_stop_byte:    call serial_wait_timeout_new_byte
                                 jnz serial_get_packet_wait
                                 mov a,e 
                                 ani serial_packet_dimension_mask 
-                                jz serial_get_packet_received
                                 mov c,a 
                                 pop h 
                                 push h 
+                                push b 
                                 mvi b,0
+                                mov a,c 
+                                ora a 
+                                jz serial_get_packet_check_end 
 serial_get_packet_check_loop:   mov a,m 
                                 add b 
                                 mov b,a 
                                 inx h 
                                 dcr c 
                                 jnz serial_get_packet_check_loop
-                                mov a,d 
-                                cmp b 
+serial_get_packet_check_end:    pop psw 
+                                mov c,a 
+                                add b 
+                                add e 
+                                adi serial_packet_start_packet_byte
+                                adi serial_packet_stop_packet_byte
+                                cmp d 
                                 jnz serial_get_packet_wait
-serial_get_packet_received:     mov a,e 
+serial_get_packet_received:     mov b,c
+                                mov a,e 
                                 ani serial_packet_acknowledge_bit_mask
                                 jnz serial_get_packet_count_check
-                                mov a,e 
-                                ani serial_packet_channel_bit_mask
-                                ori serial_packet_acknowledge_bit_mask
+                                mvi a,serial_packet_acknowledge_bit_mask
                                 call serial_send_packet 
 serial_get_packet_count_check:  lda serial_packet_count_state
                                 ani serial_packet_count_state_receive 
@@ -205,26 +224,31 @@ serial_get_packet_count_check:  lda serial_packet_count_state
                                 mov a,e 
                                 ani serial_packet_count_bit_mask
                                 jz serial_get_packet_wait
-                                jmp serial_get_packet_received
+                                jmp serial_get_packet_acknowledge
 serial_get_packet_count_check2: mov a,e 
                                 ani serial_packet_count_bit_mask
                                 jnz serial_get_packet_wait
-serial_get_packet_acknowledge:  mov a,e 
-                                ani serial_packet_acknowledge_bit_mask+serial_packet_channel_bit_mask+serial_packet_dimension_mask
+serial_get_packet_acknowledge:  mov a,e
+                                ani serial_packet_acknowledge_bit_mask+serial_packet_dimension_mask
+                                mov c,a 
 serial_get_packet_end:          pop h 
                                 pop d 
-                                pop b 
                                 ret 
 
 
+
 ;serial_send_packet sends a packet to the serial line
-;A -> packet header
+;C -> packet header
+;B -> command
 ;HL -> address to data 
 ;Cy <- 1 packet transmitted successfully, 0 otherwise
+
+
 serial_send_packet:             push d 
                                 push b 
                                 push h 
-                                ani serial_packet_acknowledge_bit_mask+serial_packet_channel_bit_mask+serial_packet_dimension_mask
+                                mov a,c 
+                                ani serial_packet_acknowledge_bit_mask+serial_packet_dimension_mask
                                 mov c,a 
                                 lda serial_packet_count_state 
                                 ani serial_packet_count_state_send
@@ -244,6 +268,12 @@ serial_send_packet_checksum:    mov a,m
                                 inx h 
                                 dcr d 
                                 jnz serial_send_packet_checksum
+                                mov a,e 
+                                add c 
+                                add b 
+                                adi serial_packet_start_packet_byte
+                                adi serial_packet_stop_packet_byte
+                                mov e,a 
 serial_send_packet_start_send:  mov a,c 
                                 ani serial_packet_dimension_mask        
                                 mov d,a 
@@ -252,6 +282,8 @@ serial_send_packet_start_send:  mov a,c
                                 mvi a,serial_packet_start_packet_byte
                                 call serial_send_new_byte
                                 mov a,c 
+                                call serial_send_new_byte 
+                                mov a,b
                                 call serial_send_new_byte
                                 mov a,e 
                                 call serial_send_new_byte
@@ -265,7 +297,6 @@ serial_send_packet_data:        mov a,m
                                 jnz serial_send_packet_data
 serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
                                 call serial_send_new_byte
-        
                                 mov a,c 
                                 ani serial_packet_acknowledge_bit_mask
                                 jnz serial_send_packet_ok
@@ -279,21 +310,9 @@ serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
 serial_send_packet_ack_check:   lxi h,$ffff-serial_packet_max_dimension+1
                                 dad sp 
                                 call serial_get_packet
-                                mov l,a 
+                                mov a,b
                                 ani serial_packet_acknowledge_bit_mask
-                                jnz serial_send_packet_ok
-                                mov a,l 
-                                ani serial_packet_channel_bit_mask
-                                mov l,a 
-                                mov a,c 
-                                ani serial_packet_channel_bit_mask
-                                cmp l 
-                                jz serial_send_packet_ok
-                                dcr b
-                                jnz serial_send_packet_start_send
-                                stc 
-                                cmc 
-                                jmp serial_send_packet_end 
+                                jz serial_send_packet_start_send
 serial_send_packet_ok:          stc 
 serial_send_packet_end:         pop h 
                                 pop b 

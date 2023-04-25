@@ -215,7 +215,7 @@ serial_get_packet_check_end:    pop psw
 serial_get_packet_received:     mov b,c
                                 mov a,e 
                                 ani serial_packet_acknowledge_bit_mask
-                                jnz serial_get_packet_count_check
+                                jnz serial_get_packet_acknowledge
                                 mvi a,serial_packet_acknowledge_bit_mask
                                 call serial_send_packet 
 serial_get_packet_count_check:  lda serial_packet_count_state
@@ -310,7 +310,7 @@ serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
 serial_send_packet_ack_check:   lxi h,$ffff-serial_packet_max_dimension+1
                                 dad sp 
                                 call serial_get_packet
-                                mov a,b
+                                mov a,c
                                 ani serial_packet_acknowledge_bit_mask
                                 jz serial_send_packet_start_send
 serial_send_packet_ok:          stc 

@@ -21,7 +21,7 @@ serial_state_output_line_mask   .equ %00000001
 
 serial_delay_value              .equ 16                 ;delay constant for byte wait functions 
                                                         ;serial_delay_value=(clk-31)/74 
-serial_wait_timeout_value       .equ 5000               ;resend timeout value (millis)
+serial_wait_timeout_value       .equ 10000              ;resend timeout value (millis)
 
 serial_packet_start_packet_byte         .equ $AA 
 serial_packet_stop_packet_byte          .equ $f0 
@@ -31,7 +31,7 @@ serial_packet_max_dimension             .equ 64
 serial_packet_acknowledge_bit_mask      .equ %10000000
 serial_packet_count_bit_mask            .equ %01000000
 
-serial_packet_resend_attempts           .equ 3 
+serial_packet_resend_attempts           .equ 5 
 
 serial_packet_buffer            .equ    $0200 
 serial_packet_count_state       .equ    serial_packet_buffer+serial_packet_max_dimension
@@ -56,15 +56,18 @@ serial_packet_count_state_receive       .equ %01000000
 
 begin:  .org start_address
         jmp start
-start:  nop
-        lxi sp,$7fff
-        mvi a,$c0 
-        sim  
+
+start:  lxi sp,$7fff
         call serial_line_initialize
         call serial_open_connection
+        jnc end 
         call serial_send_boardId
+        jnc end 
         call serial_close_connection
-        hlt 
+        jnc end 
+        mvi a,$c0 
+        sim 
+end:    hlt 
 
 
 ;serial_open_connection sends an open request to the slave 
@@ -154,7 +157,8 @@ serial_line_initialize: call serial_configure
 ;The function will block the normal execution program until it hasn't received a valid packet
 ;HL -> buffer address
 
-;C <- header 
+;A <- $ff if the packet is an ACK, $00 otherwise
+;C <- data dimension
 ;B <- command
 
 serial_get_packet:              push d 
@@ -215,7 +219,7 @@ serial_get_packet_check_end:    pop psw
 serial_get_packet_received:     mov b,c
                                 mov a,e 
                                 ani serial_packet_acknowledge_bit_mask
-                                jnz serial_get_packet_acknowledge
+                                jnz serial_get_packet_count_check
                                 mvi a,serial_packet_acknowledge_bit_mask
                                 call serial_send_packet 
 serial_get_packet_count_check:  lda serial_packet_count_state
@@ -223,14 +227,18 @@ serial_get_packet_count_check:  lda serial_packet_count_state
                                 jz serial_get_packet_count_check2
                                 mov a,e 
                                 ani serial_packet_count_bit_mask
-                                jz serial_get_packet_wait
+                                jnz serial_get_packet_wait
                                 jmp serial_get_packet_acknowledge
 serial_get_packet_count_check2: mov a,e 
                                 ani serial_packet_count_bit_mask
-                                jnz serial_get_packet_wait
-serial_get_packet_acknowledge:  mov a,e
-                                ani serial_packet_acknowledge_bit_mask+serial_packet_dimension_mask
+                                jz serial_get_packet_wait
+serial_get_packet_acknowledge:  mov a,e 
+                                ani serial_packet_dimension_mask
                                 mov c,a 
+                                mov a,e
+                                ani serial_packet_acknowledge_bit_mask
+                                jz serial_get_packet_end
+                                mvi a,$ff 
 serial_get_packet_end:          pop h 
                                 pop d 
                                 ret 
@@ -238,7 +246,8 @@ serial_get_packet_end:          pop h
 
 
 ;serial_send_packet sends a packet to the serial line
-;C -> packet header
+;A -> $FF if the packet is ACK, $00 otherwise
+;C -> packet dimension
 ;B -> command
 ;HL -> address to data 
 ;Cy <- 1 packet transmitted successfully, 0 otherwise
@@ -247,7 +256,12 @@ serial_get_packet_end:          pop h
 serial_send_packet:             push d 
                                 push b 
                                 push h 
-                                mov a,c 
+                                ora a 
+                                jz serial_send_packet_init
+                                mvi a,serial_packet_acknowledge_bit_mask
+                                ora c 
+                                mov c,a 
+serial_send_packet_init:        mov a,c 
                                 ani serial_packet_acknowledge_bit_mask+serial_packet_dimension_mask
                                 mov c,a 
                                 lda serial_packet_count_state 
@@ -310,8 +324,7 @@ serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
 serial_send_packet_ack_check:   lxi h,$ffff-serial_packet_max_dimension+1
                                 dad sp 
                                 call serial_get_packet
-                                mov a,c
-                                ani serial_packet_acknowledge_bit_mask
+                                ora a 
                                 jz serial_send_packet_start_send
 serial_send_packet_ok:          stc 
 serial_send_packet_end:         pop h 
@@ -431,5 +444,5 @@ serial_configure:   xra a
                     in serial_data_port	
                     ret 
 
-device_boardId          .text   "PX-MINI 1"
+device_boardId          .text   "PHOENIX 1 FULL"
                         .b 0 

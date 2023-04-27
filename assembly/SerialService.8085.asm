@@ -21,7 +21,7 @@ serial_state_output_line_mask   .equ %00000001
 
 serial_delay_value              .equ 16                 ;delay constant for byte wait functions 
                                                         ;serial_delay_value=(clk-31)/74 
-serial_wait_timeout_value       .equ 10000              ;resend timeout value (millis)
+serial_wait_timeout_value       .equ 5000               ;resend timeout value (millis)
 
 serial_packet_start_packet_byte         .equ $AA 
 serial_packet_stop_packet_byte          .equ $f0 
@@ -40,12 +40,12 @@ serial_command_open_connection_byte     .equ $01
 serial_command_close_connection_byte    .equ $02
 serial_command_send_identifier_byte     .equ $03 
 
-serial_command_send_terminal_char_byte          .equ $01 
-serial_command_request_terminal_char_byte       .equ $02
+serial_command_send_terminal_char_byte          .equ $11
+serial_command_request_terminal_char_byte       .equ $12
 
-serial_command_get_disk_informations_byte       .equ $01 
-serial_command_write_disk_sector_byte           .equ $02
-serial_command_read_disk_sector_byte            .equ $03 
+serial_command_get_disk_informations_byte       .equ $21 
+serial_command_write_disk_sector_byte           .equ $22
+serial_command_read_disk_sector_byte            .equ $23 
 
 
 ;contains the count state of the two serial lines 
@@ -57,17 +57,26 @@ serial_packet_count_state_receive       .equ %01000000
 begin:  .org start_address
         jmp start
 
-start:  lxi sp,$7fff
-        call serial_line_initialize
-        call serial_open_connection
-        jnc end 
-        call serial_send_boardId
-        jnc end 
-        call serial_close_connection
-        jnc end 
-        mvi a,$c0 
-        sim 
-end:    hlt 
+start:                  lxi sp,$7fff
+                        call serial_line_initialize
+                        call serial_open_connection
+                        jnc error_end 
+                        call serial_send_boardId
+                        jnc error_end 
+                        call serial_close_connection
+                        jnc error_end 
+                        mvi a,$c0 
+                        sim 
+                        hlt 
+error_end:              lxi h,1000
+error_end_blink:        mvi a,98                ;7 
+error_end_blink2:       dcr a                   ;4
+                        jnz error_end_blink2    ;10
+                        dcx h                   ;4
+                        mov a,l                 ;5
+                        ora h                   ;4
+                        jnz error_end_blink     ;10
+                        hlt 
 
 
 ;serial_open_connection sends an open request to the slave 
@@ -149,7 +158,7 @@ serial_request_terminal_char_loop:      lxi h,serial_packet_buffer
 ;serial_line_initialize resets all serial packet support system 
 
 serial_line_initialize: call serial_configure
-                        xra a 
+                        mvi a,serial_state_input_line_mask+serial_state_output_line_mask   
                         sta serial_packet_count_state 
                         ret 
 
@@ -228,10 +237,16 @@ serial_get_packet_count_check:  lda serial_packet_count_state
                                 mov a,e 
                                 ani serial_packet_count_bit_mask
                                 jnz serial_get_packet_wait
+                                lda serial_packet_count_state
+                                ani $ff-serial_packet_count_state_receive
+                                sta serial_packet_count_state 
                                 jmp serial_get_packet_acknowledge
 serial_get_packet_count_check2: mov a,e 
                                 ani serial_packet_count_bit_mask
                                 jz serial_get_packet_wait
+                                lda serial_packet_count_state
+                                ori serial_packet_count_state_receive
+                                sta serial_packet_count_state 
 serial_get_packet_acknowledge:  mov a,e 
                                 ani serial_packet_dimension_mask
                                 mov c,a 
@@ -258,13 +273,15 @@ serial_send_packet:             push d
                                 push h 
                                 ora a 
                                 jz serial_send_packet_init
-                                mvi a,serial_packet_acknowledge_bit_mask
-                                ora c 
+                                mvi a,serial_packet_dimension_mask
+                                ana c 
+                                ori serial_packet_acknowledge_bit_mask
                                 mov c,a 
+                                jmp serial_send_packet_init2
 serial_send_packet_init:        mov a,c 
-                                ani serial_packet_acknowledge_bit_mask+serial_packet_dimension_mask
+                                ani serial_packet_dimension_mask
                                 mov c,a 
-                                lda serial_packet_count_state 
+serial_send_packet_init2:       lda serial_packet_count_state 
                                 ani serial_packet_count_state_send
                                 jz serial_send_packet2
                                 mov a,c 
@@ -326,7 +343,18 @@ serial_send_packet_ack_check:   lxi h,$ffff-serial_packet_max_dimension+1
                                 call serial_get_packet
                                 ora a 
                                 jz serial_send_packet_start_send
-serial_send_packet_ok:          stc 
+serial_send_packet_ok:          lda serial_packet_count_state 
+                                ani serial_packet_count_state_send
+                                jz serial_send_packet_ok2
+                                lda serial_packet_count_state 
+                                ani $ff-serial_packet_count_state_send
+                                sta serial_packet_count_state 
+                                stc 
+                                jmp serial_send_packet_end 
+serial_send_packet_ok2:         lda serial_packet_count_state 
+                                ori serial_packet_count_state_send
+                                sta serial_packet_count_state 
+                                stc 
 serial_send_packet_end:         pop h 
                                 pop b 
                                 pop d 

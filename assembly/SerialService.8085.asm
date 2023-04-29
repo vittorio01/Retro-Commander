@@ -56,7 +56,7 @@ serial_packet_count_state_receive       .equ %01000000
 
 begin:  .org start_address
 
-        jmp  start
+        jmp  serial_send_packet ;start
 
 start:                  lxi sp,$7fff
                         mvi a,$40
@@ -92,6 +92,7 @@ error_end_blink2:       dcr a                   ;4
 serial_open_connection:         push b
                                 mvi b,serial_command_open_connection_byte  
                                 mvi c,0
+                                xra a 
                                 call serial_send_packet
                                 pop b
                                 ret 
@@ -101,6 +102,7 @@ serial_open_connection:         push b
 serial_close_connection:        push b
                                 mvi b,serial_command_close_connection_byte  
                                 mvi c,0
+                                xra a 
                                 call serial_send_packet
                                 pop b
                                 ret 
@@ -127,6 +129,7 @@ serial_send_boardId_copy_end:   lxi d,serial_packet_buffer
                                 ani serial_packet_dimension_mask
                                 mov c,a 
                                 xchg 
+                                xra a 
                                 call serial_send_packet
                                 pop h 
                                 pop d 
@@ -142,6 +145,7 @@ serial_send_terminal_char:      push h
                                 mov m,a 
                                 mvi b,serial_command_send_terminal_char_byte
                                 mvi c,1
+                                xra a 
                                 call serial_send_packet
                                 pop b 
                                 pop h 
@@ -155,6 +159,7 @@ serial_request_terminal_char:           push h
 serial_request_terminal_char_loop:      lxi h,serial_packet_buffer
                                         mvi b,serial_command_request_terminal_char_byte
                                         mvi c,0
+                                        xra a 
                                         call serial_send_packet 
                                         lxi h,serial_packet_buffer 
                                         call serial_get_packet

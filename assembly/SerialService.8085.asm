@@ -55,9 +55,12 @@ serial_packet_count_state_send          .equ %10000000
 serial_packet_count_state_receive       .equ %01000000
 
 begin:  .org start_address
-        jmp start
+
+        jmp  serial_get_packet_count_check;start
 
 start:                  lxi sp,$7fff
+                        mvi a,$40
+                        sim 
                         call serial_line_initialize
                         call serial_open_connection
                         jnc error_end 
@@ -69,6 +72,11 @@ start:                  lxi sp,$7fff
                         sim 
                         hlt 
 error_end:              lxi h,1000
+                        rim 
+                        xri $ff 
+                        ani $80 
+                        ori $40 
+                        sim  
 error_end_blink:        mvi a,98                ;7 
 error_end_blink2:       dcr a                   ;4
                         jnz error_end_blink2    ;10
@@ -76,7 +84,7 @@ error_end_blink2:       dcr a                   ;4
                         mov a,l                 ;5
                         ora h                   ;4
                         jnz error_end_blink     ;10
-                        hlt 
+                        jmp error_end 
 
 
 ;serial_open_connection sends an open request to the slave 
@@ -229,7 +237,7 @@ serial_get_packet_received:     mov b,c
                                 mov a,e 
                                 ani serial_packet_acknowledge_bit_mask
                                 jnz serial_get_packet_count_check
-                                mvi a,serial_packet_acknowledge_bit_mask
+                                mvi a,$ff 
                                 call serial_send_packet 
 serial_get_packet_count_check:  lda serial_packet_count_state
                                 ani serial_packet_count_state_receive 
@@ -472,5 +480,5 @@ serial_configure:   xra a
                     in serial_data_port	
                     ret 
 
-device_boardId          .text   "PHOENIX 1 FULL"
+device_boardId          .text   "FENIX 1 FULL"
                         .b 0 

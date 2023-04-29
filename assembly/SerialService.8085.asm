@@ -56,7 +56,7 @@ serial_packet_count_state_receive       .equ %01000000
 
 begin:  .org start_address
 
-        jmp  serial_get_packet_count_check;start
+        jmp  start
 
 start:                  lxi sp,$7fff
                         mvi a,$40

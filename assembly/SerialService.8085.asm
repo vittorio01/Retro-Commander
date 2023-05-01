@@ -58,8 +58,6 @@ begin:  .org start_address
         jmp  start
 
 start:                  lxi sp,$7fff
-                        mvi a,$40
-                        sim 
                         call serial_line_initialize
                         call serial_open_connection
                         jnc error_end 
@@ -67,23 +65,9 @@ start:                  lxi sp,$7fff
                         jnc error_end 
                         call serial_close_connection
                         jnc error_end 
-                        mvi a,$c0 
+error_end:              mvi a,$c0 
                         sim 
                         hlt 
-error_end:              lxi h,1000
-                        rim 
-                        xri $ff 
-                        ani $80 
-                        ori $40 
-                        sim  
-error_end_blink:        mvi a,98                ;7 
-error_end_blink2:       dcr a                   ;4
-                        jnz error_end_blink2    ;10
-                        dcx h                   ;4
-                        mov a,l                 ;5
-                        ora h                   ;4
-                        jnz error_end_blink     ;10
-                        jmp error_end 
 
 
 ;serial_open_connection sends an open request to the slave 
@@ -317,7 +301,13 @@ serial_send_packet_checksum:    mov a,m
                                 jnz serial_send_packet_checksum
                                 mov a,e 
                                 add c 
-                                add b 
+                                inx sp 
+                                inx sp 
+                                xthl 
+                                add h 
+                                xthl 
+                                dcx sp 
+                                dcx sp 
                                 adi serial_packet_start_packet_byte
                                 adi serial_packet_stop_packet_byte
                                 mov e,a 
@@ -330,7 +320,13 @@ serial_send_packet_start_send:  mov a,c
                                 call serial_send_new_byte
                                 mov a,c 
                                 call serial_send_new_byte 
-                                mov a,b
+                                inx sp 
+                                inx sp 
+                                xthl 
+                                mov a,h 
+                                xthl 
+                                dcx sp 
+                                dcx sp 
                                 call serial_send_new_byte
                                 mov a,e 
                                 call serial_send_new_byte

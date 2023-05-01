@@ -350,9 +350,11 @@ serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
                                 stc 
                                 cmc 
                                 jmp serial_send_packet_end
-serial_send_packet_ack_check:   lxi h,$ffff-serial_packet_max_dimension+1
+serial_send_packet_ack_check:   push b 
+                                lxi h,$ffff-serial_packet_max_dimension+1
                                 dad sp 
                                 call serial_get_packet
+                                pop b 
                                 ora a 
                                 jz serial_send_packet_start_send
 serial_send_packet_ok:          lda serial_packet_count_state 

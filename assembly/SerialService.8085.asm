@@ -8,7 +8,7 @@
 ;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
 ; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,checksum, start and stop bytes) 
 
-debug_mode      .var  false
+debug_mode      .var  true 
 
 start_address   .equ $8000 
 
@@ -288,18 +288,18 @@ serial_send_packet_init2:       lda serial_packet_count_state
                                 ori serial_packet_count_bit_mask
                                 mov c,a 
 serial_send_packet2:            mvi e,0
+                                mvi b,serial_packet_resend_attempts     ;d -> dimension 
                                 mov a,c 
                                 ani serial_packet_dimension_mask        ;c -> header
                                 mov d,a                                 ;b -> attempts
-                                jz serial_send_packet_start_send        ;e -> checksum
-                                mvi b,serial_packet_resend_attempts     ;d -> dimension 
+                                jz serial_send_packet_checksum2         ;e -> checksum
 serial_send_packet_checksum:    mov a,m 
                                 add e 
                                 mov e,a 
                                 inx h 
                                 dcr d 
                                 jnz serial_send_packet_checksum
-                                mov a,e 
+serial_send_packet_checksum2:   mov a,e 
                                 add c 
                                 inx sp 
                                 inx sp 
@@ -456,7 +456,7 @@ serial_get_input_state:     in serial_command_port                      ;10
                             ret 
 .endif 
 .if (debug_mode==true)
-serial_get_input_state:     mvi a,$ff 
+serial_get_input_state:     mvi a,$00
                             ret 
 .endif 
 ;serial_get_output_state returns the state of the serial device output line 

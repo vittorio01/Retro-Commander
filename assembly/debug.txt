@@ -1,4 +1,4 @@
-debug_mode $0000
+debug_mode $0001
 start_address $8000
 serial_data_port $0026
 serial_command_port $0027
@@ -54,6 +54,7 @@ serial_send_packet_init $814b
 serial_send_packet_init2 $814f
 serial_send_packet2 $815b
 serial_send_packet_checksum $8166
+serial_send_packet_checksum2 $816e
 serial_send_packet_start_send $817c
 serial_send_packet_data $819e
 serial_send_packet_send_stop $81a7
@@ -75,8 +76,8 @@ serial_wait_new_byte $8236
 serial_send_new_byte $8241
 serial_send_new_byte_wait $8242
 serial_get_input_state $824e
-serial_get_output_state $8256
-serial_send_byte $825e
-serial_get_byte $8261
-serial_configure $8264
-device_boardid $827a
+serial_get_output_state $8251
+serial_send_byte $8254
+serial_get_byte $8257
+serial_configure $825a
+device_boardid $825b

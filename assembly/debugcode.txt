@@ -30,7 +30,7 @@ $8037 c5         push b
 $8038 06 03      mvi b,$03
 $803a 0e 00      mvi c,$00
 $803c 21 00 02   lxi h,$0200
-$803f 11 7a 82   lxi d,$827a
+$803f 11 5b 82   lxi d,$825b
 $8042 1a         ldax d
 $8043 b7         ora a
 $8044 ca 4d 80   jz $804d
@@ -74,7 +74,7 @@ $8082 7e         mov a,m
 $8083 c1         pop b
 $8084 e1         pop h
 $8085 c9         ret
-$8086 cd 64 82   call $8264
+$8086 cd 5a 82   call $825a
 $8089 3e c0      mvi a,$c0
 $808b 32 40 02   sta $0240
 $808e c9         ret
@@ -189,11 +189,11 @@ $8157 79         mov a,c
 $8158 f6 40      ori $40
 $815a 4f         mov c,a
 $815b 1e 00      mvi e,$00
-$815d 79         mov a,c
-$815e e6 3f      ani $3f
-$8160 57         mov d,a
-$8161 ca 7c 81   jz $817c
-$8164 06 05      mvi b,$05
+$815d 06 05      mvi b,$05
+$815f 79         mov a,c
+$8160 e6 3f      ani $3f
+$8162 57         mov d,a
+$8163 ca 6e 81   jz $816e
 $8166 7e         mov a,m
 $8167 83         add e
 $8168 5f         mov e,a
@@ -291,7 +291,7 @@ $8207 af         xra a
 $8208 37         stc
 $8209 3f         cmc
 $820a c3 11 82   jmp $8211
-$820d cd 61 82   call $8261
+$820d cd 57 82   call $8257
 $8210 37         stc
 $8211 d1         pop d
 $8212 c1         pop b
@@ -320,41 +320,24 @@ $8235 c9         ret
 $8236 cd 4e 82   call $824e
 $8239 b7         ora a
 $823a ca 36 82   jz $8236
-$823d cd 61 82   call $8261
+$823d cd 57 82   call $8257
 $8240 c9         ret
 $8241 f5         push psw
-$8242 cd 56 82   call $8256
+$8242 cd 51 82   call $8251
 $8245 b7         ora a
 $8246 ca 42 82   jz $8242
 $8249 f1         pop psw
-$824a cd 5e 82   call $825e
+$824a cd 54 82   call $8254
 $824d c9         ret
-$824e db 27      in $27
-$8250 e6 02      ani $02
-$8252 c8         rz
-$8253 3e ff      mvi a,$ff
-$8255 c9         ret
-$8256 db 27      in $27
-$8258 e6 01      ani $01
-$825a c8         rz
-$825b 3e ff      mvi a,$ff
-$825d c9         ret
-$825e d3 26      out $26
-$8260 c9         ret
-$8261 db 26      in $26
-$8263 c9         ret
-$8264 af         xra a
-$8265 d3 27      out $27
-$8267 d3 27      out $27
-$8269 d3 27      out $27
-$826b 3e 40      mvi a,$40
-$826d d3 27      out $27
-$826f 3e 4d      mvi a,$4d
-$8271 d3 27      out $27
-$8273 3e 37      mvi a,$37
-$8275 d3 27      out $27
-$8277 db 26      in $26
-$8279 c9         ret
+$824e 3e 00      mvi a,$00
+$8250 c9         ret
+$8251 3e ff      mvi a,$ff
+$8253 c9         ret
+$8254 d3 26      out $26
+$8256 c9         ret
+$8257 db 26      in $26
+$8259 c9         ret
+$825a c9         ret
 
-$827a 46 45 4e 49 58 20 31 20   FENIX 1 
-$8282 46 55 4c 4c 00            FULL.
+$825b 46 45 4e 49 58 20 31 20   FENIX 1 
+$8263 46 55 4c 4c 00            FULL.

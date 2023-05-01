@@ -8,7 +8,7 @@
 ;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
 ; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,checksum, start and stop bytes) 
 
-
+debug_mode      .var  false
 
 start_address   .equ $8000 
 
@@ -55,7 +55,6 @@ serial_packet_count_state_send          .equ %10000000
 serial_packet_count_state_receive       .equ %01000000
 
 begin:  .org start_address
-
         jmp  start
 
 start:                  lxi sp,$7fff
@@ -171,7 +170,7 @@ serial_request_terminal_char_loop:      lxi h,serial_packet_buffer
 ;serial_line_initialize resets all serial packet support system 
 
 serial_line_initialize: call serial_configure
-                        mvi a,serial_state_input_line_mask+serial_state_output_line_mask   
+                        mvi a,serial_packet_count_state_send+serial_packet_count_state_receive 
                         sta serial_packet_count_state 
                         ret 
 
@@ -242,8 +241,12 @@ serial_get_packet_received:     mov b,c
                                 mov a,e 
                                 ani serial_packet_acknowledge_bit_mask
                                 jnz serial_get_packet_count_check
+                                push b 
+                                mvi b,0 
+                                mvi c,0 
                                 mvi a,$ff 
-                                call serial_send_packet 
+                                call serial_send_packet
+                                pop b  
 serial_get_packet_count_check:  lda serial_packet_count_state
                                 ani serial_packet_count_state_receive 
                                 jz serial_get_packet_count_check2
@@ -447,20 +450,30 @@ serial_send_new_byte_wait:  call serial_get_output_state
 
 ;serial_get_input_state returns the state of the serial device input line
 ;A <- $ff if there is an incoming byte, $00 otherwise 
+.if (debug_mode==false)
 serial_get_input_state:     in serial_command_port                      ;10
                             ani serial_state_input_line_mask            ;7
                             rz                                          ;11
                             mvi a,$ff 
                             ret 
-
+.endif 
+.if (debug_mode==true)
+serial_get_input_state:     mvi a,$ff 
+                            ret 
+.endif 
 ;serial_get_output_state returns the state of the serial device output line 
 ;A <- $ff if the serial device can transmit a byte, $00 otherwise
+.if (debug_mode==false)
 serial_get_output_state:    in serial_command_port
                             ani serial_state_output_line_mask
                             rz 
                             mvi a,$ff 
                             ret 
-
+.endif 
+.if (debug_mode==true)
+serial_get_output_state:        mvi a,$ff 
+                                ret 
+.endif 
 ;serial_send_byte sends a new byte to the serial port 
 ;A -> byte to send
 serial_send_byte:   out serial_data_port
@@ -472,6 +485,7 @@ serial_get_byte:    in serial_data_port
                     ret 
 
 ;serial_configure resets the serial device and reconfigure all settings
+.if (debug_mode==false)
 serial_configure:   xra a 	
                     out serial_command_port		
                     out serial_command_port	
@@ -484,6 +498,9 @@ serial_configure:   xra a
                     out serial_command_port	
                     in serial_data_port	
                     ret 
-
+.endif 
+.if (debug_mode==true) 
+serial_configure:   ret 
+.endif 
 device_boardId          .text   "FENIX 1 FULL"
                         .b 0 

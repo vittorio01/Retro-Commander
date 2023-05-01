@@ -1,0 +1,362 @@
+$8000 c3 03 80   jmp $8003
+$8003 31 ff 7f   lxi sp,$7fff
+$8006 3e 40      mvi a,$40
+$8008 30         sim
+$8009 cd a3 80   call $80a3
+$800c cd 3c 80   call $803c
+$800f d2 22 80   jnc $8022
+$8012 cd 52 80   call $8052
+$8015 d2 22 80   jnc $8022
+$8018 cd 47 80   call $8047
+$801b d2 22 80   jnc $8022
+$801e 3e c0      mvi a,$c0
+$8020 30         sim
+$8021 76         hlt
+$8022 21 e8 03   lxi h,$03e8
+$8025 20         rim
+$8026 ee ff      xri $ff
+$8028 e6 80      ani $80
+$802a f6 40      ori $40
+$802c 30         sim
+$802d 3e 62      mvi a,$62
+$802f 3d         dcr a
+$8030 c2 2f 80   jnz $802f
+$8033 2b         dcx h
+$8034 7d         mov a,l
+$8035 b4         ora h
+$8036 c2 2d 80   jnz $802d
+$8039 c3 22 80   jmp $8022
+$803c c5         push b
+$803d 06 01      mvi b,$01
+$803f 0e 00      mvi c,$00
+$8041 af         xra a
+$8042 cd 58 81   call $8158
+$8045 c1         pop b
+$8046 c9         ret
+$8047 c5         push b
+$8048 06 02      mvi b,$02
+$804a 0e 00      mvi c,$00
+$804c af         xra a
+$804d cd 58 81   call $8158
+$8050 c1         pop b
+$8051 c9         ret
+$8052 e5         push h
+$8053 d5         push d
+$8054 c5         push b
+$8055 06 03      mvi b,$03
+$8057 0e 00      mvi c,$00
+$8059 21 00 02   lxi h,$0200
+$805c 11 89 82   lxi d,$8289
+$805f 1a         ldax d
+$8060 b7         ora a
+$8061 ca 6a 80   jz $806a
+$8064 77         mov m,a
+$8065 13         inx d
+$8066 23         inx h
+$8067 c3 5f 80   jmp $805f
+$806a 11 00 02   lxi d,$0200
+$806d 7d         mov a,l
+$806e 93         sub e
+$806f e6 3f      ani $3f
+$8071 4f         mov c,a
+$8072 eb         xchg
+$8073 af         xra a
+$8074 cd 58 81   call $8158
+$8077 e1         pop h
+$8078 d1         pop d
+$8079 c1         pop b
+$807a c9         ret
+$807b e5         push h
+$807c c5         push b
+$807d 21 00 02   lxi h,$0200
+$8080 77         mov m,a
+$8081 06 11      mvi b,$11
+$8083 0e 01      mvi c,$01
+$8085 af         xra a
+$8086 cd 58 81   call $8158
+$8089 c1         pop b
+$808a e1         pop h
+$808b c9         ret
+$808c e5         push h
+$808d c5         push b
+$808e 21 00 02   lxi h,$0200
+$8091 06 12      mvi b,$12
+$8093 0e 00      mvi c,$00
+$8095 af         xra a
+$8096 cd 58 81   call $8158
+$8099 21 00 02   lxi h,$0200
+$809c cd ac 80   call $80ac
+$809f 7e         mov a,m
+$80a0 c1         pop b
+$80a1 e1         pop h
+$80a2 c9         ret
+$80a3 cd 73 82   call $8273
+$80a6 3e c0      mvi a,$c0
+$80a8 32 40 02   sta $0240
+$80ab c9         ret
+$80ac d5         push d
+$80ad e5         push h
+$80ae 01 00 00   lxi b,$0000
+$80b1 e1         pop h
+$80b2 e5         push h
+$80b3 cd 45 82   call $8245
+$80b6 fe aa      cpi $aa
+$80b8 c2 b1 80   jnz $80b1
+$80bb cd fe 81   call $81fe
+$80be d2 b1 80   jnc $80b1
+$80c1 5f         mov e,a
+$80c2 cd fe 81   call $81fe
+$80c5 d2 b1 80   jnc $80b1
+$80c8 47         mov b,a
+$80c9 cd fe 81   call $81fe
+$80cc d2 b1 80   jnc $80b1
+$80cf 57         mov d,a
+$80d0 7b         mov a,e
+$80d1 e6 3f      ani $3f
+$80d3 ca e3 80   jz $80e3
+$80d6 4f         mov c,a
+$80d7 cd fe 81   call $81fe
+$80da d2 b1 80   jnc $80b1
+$80dd 77         mov m,a
+$80de 23         inx h
+$80df 0d         dcr c
+$80e0 c2 d7 80   jnz $80d7
+$80e3 cd fe 81   call $81fe
+$80e6 d2 b1 80   jnc $80b1
+$80e9 fe f0      cpi $f0
+$80eb c2 b1 80   jnz $80b1
+$80ee 7b         mov a,e
+$80ef e6 3f      ani $3f
+$80f1 4f         mov c,a
+$80f2 e1         pop h
+$80f3 e5         push h
+$80f4 c5         push b
+$80f5 06 00      mvi b,$00
+$80f7 79         mov a,c
+$80f8 b7         ora a
+$80f9 ca 04 81   jz $8104
+$80fc 7e         mov a,m
+$80fd 80         add b
+$80fe 47         mov b,a
+$80ff 23         inx h
+$8100 0d         dcr c
+$8101 c2 fc 80   jnz $80fc
+$8104 f1         pop psw
+$8105 4f         mov c,a
+$8106 80         add b
+$8107 83         add e
+$8108 c6 aa      adi $aa
+$810a c6 f0      adi $f0
+$810c ba         cmp d
+$810d c2 b1 80   jnz $80b1
+$8110 41         mov b,c
+$8111 7b         mov a,e
+$8112 e6 80      ani $80
+$8114 c2 22 81   jnz $8122
+$8117 c5         push b
+$8118 06 00      mvi b,$00
+$811a 0e 00      mvi c,$00
+$811c 3e ff      mvi a,$ff
+$811e cd 58 81   call $8158
+$8121 c1         pop b
+$8122 3a 40 02   lda $0240
+$8125 e6 40      ani $40
+$8127 ca 3b 81   jz $813b
+$812a 7b         mov a,e
+$812b e6 40      ani $40
+$812d c2 b1 80   jnz $80b1
+$8130 3a 40 02   lda $0240
+$8133 e6 bf      ani $bf
+$8135 32 40 02   sta $0240
+$8138 c3 49 81   jmp $8149
+$813b 7b         mov a,e
+$813c e6 40      ani $40
+$813e ca b1 80   jz $80b1
+$8141 3a 40 02   lda $0240
+$8144 f6 40      ori $40
+$8146 32 40 02   sta $0240
+$8149 7b         mov a,e
+$814a e6 3f      ani $3f
+$814c 4f         mov c,a
+$814d 7b         mov a,e
+$814e e6 80      ani $80
+$8150 ca 55 81   jz $8155
+$8153 3e ff      mvi a,$ff
+$8155 e1         pop h
+$8156 d1         pop d
+$8157 c9         ret
+$8158 d5         push d
+$8159 c5         push b
+$815a e5         push h
+$815b b7         ora a
+$815c ca 68 81   jz $8168
+$815f 3e 3f      mvi a,$3f
+$8161 a1         ana c
+$8162 f6 80      ori $80
+$8164 4f         mov c,a
+$8165 c3 6c 81   jmp $816c
+$8168 79         mov a,c
+$8169 e6 3f      ani $3f
+$816b 4f         mov c,a
+$816c 3a 40 02   lda $0240
+$816f e6 80      ani $80
+$8171 ca 78 81   jz $8178
+$8174 79         mov a,c
+$8175 f6 40      ori $40
+$8177 4f         mov c,a
+$8178 1e 00      mvi e,$00
+$817a 79         mov a,c
+$817b e6 3f      ani $3f
+$817d 57         mov d,a
+$817e ca 93 81   jz $8193
+$8181 06 05      mvi b,$05
+$8183 7e         mov a,m
+$8184 83         add e
+$8185 5f         mov e,a
+$8186 23         inx h
+$8187 15         dcr d
+$8188 c2 83 81   jnz $8183
+$818b 7b         mov a,e
+$818c 81         add c
+$818d 80         add b
+$818e c6 aa      adi $aa
+$8190 c6 f0      adi $f0
+$8192 5f         mov e,a
+$8193 79         mov a,c
+$8194 e6 3f      ani $3f
+$8196 57         mov d,a
+$8197 e1         pop h
+$8198 e5         push h
+$8199 3e aa      mvi a,$aa
+$819b cd 50 82   call $8250
+$819e 79         mov a,c
+$819f cd 50 82   call $8250
+$81a2 78         mov a,b
+$81a3 cd 50 82   call $8250
+$81a6 7b         mov a,e
+$81a7 cd 50 82   call $8250
+$81aa 7a         mov a,d
+$81ab b7         ora a
+$81ac ca b8 81   jz $81b8
+$81af 7e         mov a,m
+$81b0 cd 50 82   call $8250
+$81b3 23         inx h
+$81b4 15         dcr d
+$81b5 c2 af 81   jnz $81af
+$81b8 3e f0      mvi a,$f0
+$81ba cd 50 82   call $8250
+$81bd 79         mov a,c
+$81be e6 80      ani $80
+$81c0 c2 dd 81   jnz $81dd
+$81c3 cd 23 82   call $8223
+$81c6 da d2 81   jc $81d2
+$81c9 05         dcr b
+$81ca c2 93 81   jnz $8193
+$81cd 37         stc
+$81ce 3f         cmc
+$81cf c3 fa 81   jmp $81fa
+$81d2 21 c0 ff   lxi h,$ffc0
+$81d5 39         dad sp
+$81d6 cd ac 80   call $80ac
+$81d9 b7         ora a
+$81da ca 93 81   jz $8193
+$81dd 3a 40 02   lda $0240
+$81e0 e6 80      ani $80
+$81e2 ca f1 81   jz $81f1
+$81e5 3a 40 02   lda $0240
+$81e8 e6 7f      ani $7f
+$81ea 32 40 02   sta $0240
+$81ed 37         stc
+$81ee c3 fa 81   jmp $81fa
+$81f1 3a 40 02   lda $0240
+$81f4 f6 80      ori $80
+$81f6 32 40 02   sta $0240
+$81f9 37         stc
+$81fa e1         pop h
+$81fb c1         pop b
+$81fc d1         pop d
+$81fd c9         ret
+$81fe c5         push b
+$81ff d5         push d
+$8200 11 88 13   lxi d,$1388
+$8203 06 10      mvi b,$10
+$8205 cd 5d 82   call $825d
+$8208 b7         ora a
+$8209 c2 1c 82   jnz $821c
+$820c 05         dcr b
+$820d c2 05 82   jnz $8205
+$8210 1b         dcx d
+$8211 7b         mov a,e
+$8212 b2         ora d
+$8213 c2 03 82   jnz $8203
+$8216 af         xra a
+$8217 37         stc
+$8218 3f         cmc
+$8219 c3 20 82   jmp $8220
+$821c cd 70 82   call $8270
+$821f 37         stc
+$8220 d1         pop d
+$8221 c1         pop b
+$8222 c9         ret
+$8223 c5         push b
+$8224 d5         push d
+$8225 11 88 13   lxi d,$1388
+$8228 06 10      mvi b,$10
+$822a cd 5d 82   call $825d
+$822d b7         ora a
+$822e c2 41 82   jnz $8241
+$8231 05         dcr b
+$8232 c2 2a 82   jnz $822a
+$8235 1b         dcx d
+$8236 7b         mov a,e
+$8237 b2         ora d
+$8238 c2 28 82   jnz $8228
+$823b af         xra a
+$823c 37         stc
+$823d 3f         cmc
+$823e c3 42 82   jmp $8242
+$8241 37         stc
+$8242 d1         pop d
+$8243 c1         pop b
+$8244 c9         ret
+$8245 cd 5d 82   call $825d
+$8248 b7         ora a
+$8249 ca 45 82   jz $8245
+$824c cd 70 82   call $8270
+$824f c9         ret
+$8250 f5         push psw
+$8251 cd 65 82   call $8265
+$8254 b7         ora a
+$8255 ca 51 82   jz $8251
+$8258 f1         pop psw
+$8259 cd 6d 82   call $826d
+$825c c9         ret
+$825d db 27      in $27
+$825f e6 02      ani $02
+$8261 c8         rz
+$8262 3e ff      mvi a,$ff
+$8264 c9         ret
+$8265 db 27      in $27
+$8267 e6 01      ani $01
+$8269 c8         rz
+$826a 3e ff      mvi a,$ff
+$826c c9         ret
+$826d d3 26      out $26
+$826f c9         ret
+$8270 db 26      in $26
+$8272 c9         ret
+$8273 af         xra a
+$8274 d3 27      out $27
+$8276 d3 27      out $27
+$8278 d3 27      out $27
+$827a 3e 40      mvi a,$40
+$827c d3 27      out $27
+$827e 3e 4d      mvi a,$4d
+$8280 d3 27      out $27
+$8282 3e 37      mvi a,$37
+$8284 d3 27      out $27
+$8286 db 26      in $26
+$8288 c9         ret
+
+$8289 46 45 4e 49 58 20 31 20   FENIX 1 
+$8291 46 55 4c 4c 00            FULL.

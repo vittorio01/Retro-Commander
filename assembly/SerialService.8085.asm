@@ -76,7 +76,7 @@ serial_reset_connection_retry:  mvi b,serial_command_reset_connection_byte
                                 ori serial_packet_connection_reset 
                                 sta serial_packet_state
 serial_send_boardId:            mvi b,serial_command_send_identifier_byte
-                                lxi h,$ffff-serial_packet_max_dimension
+                                lxi h,$ffff-serial_packet_max_dimension+1
                                 mvi c,0 
                                 dad sp 
                                 lxi d,device_boardId
@@ -88,7 +88,7 @@ serial_send_boardId_copy:       ldax d
                                 inx h 
                                 inr c 
                                 jmp serial_send_boardId_copy
-serial_send_boardId_send:       lxi h,$ffff-serial_packet_max_dimension
+serial_send_boardId_send:       lxi h,$ffff-serial_packet_max_dimension+1
                                 dad sp 
                                 xra a 
                                 call serial_send_packet
@@ -103,7 +103,7 @@ serial_reset_connection_end:    pop h
 
 serial_send_terminal_char:              push h 
                                         push b 
-                                        lxi h,$ffff-serial_packet_max_dimension
+                                        lxi h,$ffff-serial_packet_max_dimension+1
                                         dad sp 
                                         mov m,a 
                                         mvi b,serial_command_send_terminal_char_byte
@@ -120,14 +120,16 @@ serial_send_terminal_char_end:          pop b
 
 serial_request_terminal_char:           push h 
                                         push b 
-                                        lxi h,$ffff-serial_packet_max_dimension
+                                        lxi h,$ffff-serial_packet_max_dimension+1
                                         dad sp 
                                         mvi b,serial_command_request_terminal_char_byte
                                         mvi c,0
 serial_request_terminal_char_retry:     xra a 
                                         call serial_send_packet 
                                         jc serial_request_terminal_char_retry 
-serial_request_terminal_char_get_retry: call serial_get_packet
+serial_request_terminal_char_get_retry: stc 
+                                        cmc 
+                                        call serial_get_packet
                                         mov a,b 
                                         cpi serial_command_request_terminal_char_byte
                                         jnz serial_request_terminal_char_get_retry
@@ -144,7 +146,8 @@ serial_line_initialize: call serial_configure
                         ret 
 
 ;serial_get_packet read a packet from the serial line, do the checksum and send an ACK to the serial port if it's valid.
-;The function will block the normal execution program until it hasn't received a valid packet
+
+;CY -> 1 if the packet has to be waited, 0 if a preliminar timeout is needed
 ;HL -> buffer address
 
 ;A <- $ff if the packet is an ACK, $00 otherwise
@@ -152,36 +155,46 @@ serial_line_initialize: call serial_configure
 ;B <- command
 
 serial_get_packet:              push d 
+                                push psw 
                                 push h 
-                                lxi b,0 
-serial_get_packet_wait:         pop h 
+serial_get_packet_retry:        pop h 
+                                pop psw 
+                                push psw 
                                 push h 
-                                call serial_wait_new_byte
-                                cpi serial_packet_start_packet_byte
-                                jnz serial_get_packet_wait
-                                call serial_wait_timeout_new_byte
                                 jnc serial_get_packet_wait
+serial_get_packet_wait_timeout: call serial_wait_timeout_new_byte
+                                jc serial_get_packet_begin
+                                lxi b,0 
+                                xra a 
+                                stc 
+                                cmc 
+                                jmp serial_get_packet_end
+serial_get_packet_wait:         call serial_wait_new_byte
+serial_get_packet_begin:        cpi serial_packet_start_packet_byte
+                                jnz serial_get_packet_retry
+                                call serial_wait_timeout_new_byte
+                                jnc serial_get_packet_retry
                                 mov e,a                                 ;E <- header 
                                 call serial_wait_timeout_new_byte       
-                                jnc serial_get_packet_wait      
+                                jnc serial_get_packet_retry     
                                 mov b,a                                 ;B <- command
                                 call serial_wait_timeout_new_byte 
-                                jnc serial_get_packet_wait
+                                jnc serial_get_packet_retry
                                 mov d,a                                 ;D <- checksum
                                 mov a,e 
                                 ani serial_packet_dimension_mask   
                                 jz serial_get_packet_stop_byte           
                                 mov c,a                                       
 serial_get_packet_bytes_loop:   call serial_wait_timeout_new_byte
-                                jnc serial_get_packet_wait
+                                jnc serial_get_packet_retry
                                 mov m,a 
                                 inx h 
                                 dcr c 
                                 jnz serial_get_packet_bytes_loop
 serial_get_packet_stop_byte:    call serial_wait_timeout_new_byte
-                                jnc serial_get_packet_wait
+                                jnc serial_get_packet_retry
                                 cpi serial_packet_stop_packet_byte
-                                jnz serial_get_packet_wait
+                                jnz serial_get_packet_retry
                                 mov a,e 
                                 ani serial_packet_dimension_mask 
                                 mov c,a 
@@ -205,7 +218,7 @@ serial_get_packet_check_end:    pop psw
                                 adi serial_packet_start_packet_byte
                                 adi serial_packet_stop_packet_byte
                                 cmp d 
-                                jnz serial_get_packet_wait
+                                jnz serial_get_packet_retry
 serial_get_packet_received:     mov b,c
                                 mov a,e 
                                 ani serial_packet_acknowledge_bit_mask
@@ -221,14 +234,14 @@ serial_get_packet_count_check:  lda serial_packet_state
                                 jz serial_get_packet_count_check2
                                 mov a,e 
                                 ani serial_packet_count_bit_mask
-                                jnz serial_get_packet_wait
+                                jnz serial_get_packet_retry
                                 lda serial_packet_state
                                 ani $ff-serial_packet_state_receive
                                 sta serial_packet_state 
                                 jmp serial_get_packet_acknowledge
 serial_get_packet_count_check2: mov a,e 
                                 ani serial_packet_count_bit_mask
-                                jz serial_get_packet_wait
+                                jz serial_get_packet_retry
                                 lda serial_packet_state
                                 ori serial_packet_state_receive
                                 sta serial_packet_state 
@@ -240,6 +253,8 @@ serial_get_packet_acknowledge:  mov a,e
                                 jz serial_get_packet_end
                                 mvi a,$ff 
 serial_get_packet_end:          pop h 
+                                inx sp 
+                                inx sp 
                                 pop d 
                                 ret 
 
@@ -328,20 +343,20 @@ serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
                                 mov a,c 
                                 ani serial_packet_acknowledge_bit_mask
                                 jnz serial_send_packet_ok
-                                call serial_listen_new_byte
-                                jc serial_send_packet_ack_check
-                                dcr b
+                                push b 
+                                lxi h,$ffff-serial_packet_max_dimension+1
+                                dad sp 
+                                stc 
+                                call serial_get_packet 
+                                pop b 
+                                jnc serial_send_packet_send_retry
+                                ora a 
+                                jnz serial_send_packet_ok
+serial_send_packet_send_retry:  dcr b
                                 jnz serial_send_packet_start_send
                                 stc 
                                 cmc 
                                 jmp serial_send_packet_end
-serial_send_packet_ack_check:   push b 
-                                lxi h,$ffff-serial_packet_max_dimension+1
-                                dad sp 
-                                call serial_get_packet
-                                pop b 
-                                ora a 
-                                jz serial_send_packet_start_send
 serial_send_packet_ok:          lda serial_packet_state 
                                 ani serial_packet_state_send
                                 jz serial_send_packet_ok2
@@ -385,32 +400,7 @@ serial_wait_timeout_new_byte_received:          call serial_get_byte
 serial_wait_timeout_new_byte_end:               pop d 
                                                 pop b 
                                                 ret 
-
-
-;serial_listen_new_byte wait until a new byte is received on the serial line
-;Cy -> 0 if timeout, 1 byte received
-serial_listen_new_byte:                 push b 
-                                        push d 
-                                        lxi d,serial_wait_timeout_value
-serial_listen_new_byte_reset:           mvi b,serial_delay_value 
-serial_listen_new_byte_check:           call serial_get_input_state
-                                        ora a 
-                                        jnz serial_listen_new_byte_received 
-                                        dcr b 
-                                        jnz serial_listen_new_byte_check
-                                        dcx d 
-                                        mov a,e 
-                                        ora d 
-                                        jnz serial_listen_new_byte_reset
-                                        xra a
-                                        stc 
-                                        cmc 
-                                        jmp serial_listen_new_byte_end
-serial_listen_new_byte_received:        stc 
-serial_listen_new_byte_end:             pop d 
-                                        pop b 
-                                        ret 
-
+ 
 ;serial_wait_new_byte wait until the serial device reads a new byte and returns it's value
 ; A <- received byte
 

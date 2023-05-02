@@ -8,9 +8,10 @@
 ;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
 ; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,checksum, start and stop bytes) 
 
-debug_mode      .var  true 
+debug_mode      .var  false 
 
-start_address   .equ $8000 
+start_address                           .equ    $8000 
+serial_packet_state                     .equ    $0200
 
 serial_data_port        .equ %00100110
 serial_command_port     .equ %00100111
@@ -33,12 +34,8 @@ serial_packet_count_bit_mask            .equ %01000000
 
 serial_packet_resend_attempts           .equ 5 
 
-serial_packet_buffer            .equ    $0200 
-serial_packet_count_state       .equ    serial_packet_buffer+serial_packet_max_dimension
-
-serial_command_open_connection_byte     .equ $01
-serial_command_close_connection_byte    .equ $02
-serial_command_send_identifier_byte     .equ $03 
+serial_command_reset_connection_byte    .equ $01
+serial_command_send_identifier_byte     .equ $02
 
 serial_command_send_terminal_char_byte          .equ $11
 serial_command_request_terminal_char_byte       .equ $12
@@ -51,101 +48,89 @@ serial_command_read_disk_sector_byte            .equ $23
 ;contains the count state of the two serial lines 
 ; bit 8 -> send count 
 ; bit 7 -> receive count   
-serial_packet_count_state_send          .equ %10000000
-serial_packet_count_state_receive       .equ %01000000
+serial_packet_state_send          .equ %10000000
+serial_packet_state_receive       .equ %01000000
+serial_packet_connection_reset    .equ %00100000
 
 begin:  .org start_address
         jmp  start
 
 start:                  lxi sp,$7fff
                         call serial_line_initialize
-                        call serial_open_connection
-                        jnc error_end 
-                        call serial_send_boardId
-                        jnc error_end 
-                        call serial_close_connection
-                        jnc error_end 
-error_end:              mvi a,$c0 
-                        sim 
+                        call serial_reset_connection
+                        
                         hlt 
 
 
-;serial_open_connection sends an open request to the slave 
-;Cy -> 1 operation ok, 0 error during transmission 
-serial_open_connection:         push b
-                                mvi b,serial_command_open_connection_byte  
-                                mvi c,0
-                                xra a 
-                                call serial_send_packet
-                                pop b
-                                ret 
+;serial_reset_connection sends an open request to the slave and send the board ID
 
-;serial_close_connection sends a close request to the slave 
-;Cy -> 1 operation ok, 0 error during transmission 
-serial_close_connection:        push b
-                                mvi b,serial_command_close_connection_byte  
-                                mvi c,0
-                                xra a 
-                                call serial_send_packet
-                                pop b
-                                ret 
-
-;serial_open_connection sends the boardId to the slave 
-;Cy -> 1 operation ok, 0 error during transmission 
-serial_send_boardId:            push h 
+serial_reset_connection:        push b
                                 push d 
-                                push b 
-                                mvi b,serial_command_send_identifier_byte
+                                push h 
+serial_reset_connection_retry:  mvi b,serial_command_reset_connection_byte  
                                 mvi c,0
-                                lxi h,serial_packet_buffer
+                                xra a 
+                                call serial_send_packet
+                                jnc serial_reset_connection_retry
+                                lda serial_packet_state 
+                                ori serial_packet_connection_reset 
+                                sta serial_packet_state
+serial_send_boardId:            mvi b,serial_command_send_identifier_byte
+                                lxi h,$ffff-serial_packet_max_dimension
+                                mvi c,0 
+                                dad sp 
                                 lxi d,device_boardId
 serial_send_boardId_copy:       ldax d  
                                 ora a 
-                                jz serial_send_boardId_copy_end
+                                jz serial_send_boardId_send
                                 mov m,a 
                                 inx d 
                                 inx h 
+                                inr c 
                                 jmp serial_send_boardId_copy
-serial_send_boardId_copy_end:   lxi d,serial_packet_buffer 
-                                mov a,l 
-                                sub e 
-                                ani serial_packet_dimension_mask
-                                mov c,a 
-                                xchg 
+serial_send_boardId_send:       lxi h,$ffff-serial_packet_max_dimension
+                                dad sp 
                                 xra a 
                                 call serial_send_packet
-                                pop h 
+                                jnc serial_send_boardId_send
+serial_reset_connection_end:    pop h 
                                 pop d 
-                                pop b 
+                                pop b
                                 ret 
 
 ;serial_send_terminal_char sends a terminal char to the slave 
 ;A -> char to send 
 
-serial_send_terminal_char:      push h 
-                                push b 
-                                lxi h,serial_packet_buffer
-                                mov m,a 
-                                mvi b,serial_command_send_terminal_char_byte
-                                mvi c,1
-                                xra a 
-                                call serial_send_packet
-                                pop b 
-                                pop h 
-                                ret 
+serial_send_terminal_char:              push h 
+                                        push b 
+                                        lxi h,$ffff-serial_packet_max_dimension
+                                        dad sp 
+                                        mov m,a 
+                                        mvi b,serial_command_send_terminal_char_byte
+                                        mvi c,1
+serial_send_terminal_char_retry:        xra a 
+                                        call serial_send_packet
+                                        jnc serial_send_terminal_char_retry
+serial_send_terminal_char_end:          pop b 
+                                        pop h 
+                                        ret 
 
 ;serial_request_terminal_char requests a char from the slave terminal
 ;A <- char received 
 
 serial_request_terminal_char:           push h 
                                         push b 
-serial_request_terminal_char_loop:      lxi h,serial_packet_buffer
+                                        lxi h,$ffff-serial_packet_max_dimension
+                                        dad sp 
                                         mvi b,serial_command_request_terminal_char_byte
                                         mvi c,0
-                                        xra a 
+serial_request_terminal_char_retry:     xra a 
                                         call serial_send_packet 
-                                        lxi h,serial_packet_buffer 
-                                        call serial_get_packet
+                                        jc serial_request_terminal_char_retry 
+serial_request_terminal_char_get_retry: call serial_get_packet
+                                        mov a,b 
+                                        cpi serial_command_request_terminal_char_byte
+                                        jnz serial_request_terminal_char_get_retry
                                         mov a,m 
                                         pop b 
                                         pop h 
@@ -154,8 +139,8 @@ serial_request_terminal_char_loop:      lxi h,serial_packet_buffer
 ;serial_line_initialize resets all serial packet support system 
 
 serial_line_initialize: call serial_configure
-                        mvi a,serial_packet_count_state_send+serial_packet_count_state_receive 
-                        sta serial_packet_count_state 
+                        mvi a,serial_packet_state_send+serial_packet_state_receive 
+                        sta serial_packet_state 
                         ret 
 
 ;serial_get_packet read a packet from the serial line, do the checksum and send an ACK to the serial port if it's valid.
@@ -231,22 +216,22 @@ serial_get_packet_received:     mov b,c
                                 mvi a,$ff 
                                 call serial_send_packet
                                 pop b  
-serial_get_packet_count_check:  lda serial_packet_count_state
-                                ani serial_packet_count_state_receive 
+serial_get_packet_count_check:  lda serial_packet_state
+                                ani serial_packet_state_receive 
                                 jz serial_get_packet_count_check2
                                 mov a,e 
                                 ani serial_packet_count_bit_mask
                                 jnz serial_get_packet_wait
-                                lda serial_packet_count_state
-                                ani $ff-serial_packet_count_state_receive
-                                sta serial_packet_count_state 
+                                lda serial_packet_state
+                                ani $ff-serial_packet_state_receive
+                                sta serial_packet_state 
                                 jmp serial_get_packet_acknowledge
 serial_get_packet_count_check2: mov a,e 
                                 ani serial_packet_count_bit_mask
                                 jz serial_get_packet_wait
-                                lda serial_packet_count_state
-                                ori serial_packet_count_state_receive
-                                sta serial_packet_count_state 
+                                lda serial_packet_state
+                                ori serial_packet_state_receive
+                                sta serial_packet_state 
 serial_get_packet_acknowledge:  mov a,e 
                                 ani serial_packet_dimension_mask
                                 mov c,a 
@@ -281,8 +266,8 @@ serial_send_packet:             push d
 serial_send_packet_init:        mov a,c 
                                 ani serial_packet_dimension_mask
                                 mov c,a 
-serial_send_packet_init2:       lda serial_packet_count_state 
-                                ani serial_packet_count_state_send
+serial_send_packet_init2:       lda serial_packet_state 
+                                ani serial_packet_state_send
                                 jz serial_send_packet2
                                 mov a,c 
                                 ori serial_packet_count_bit_mask
@@ -357,17 +342,17 @@ serial_send_packet_ack_check:   push b
                                 pop b 
                                 ora a 
                                 jz serial_send_packet_start_send
-serial_send_packet_ok:          lda serial_packet_count_state 
-                                ani serial_packet_count_state_send
+serial_send_packet_ok:          lda serial_packet_state 
+                                ani serial_packet_state_send
                                 jz serial_send_packet_ok2
-                                lda serial_packet_count_state 
-                                ani $ff-serial_packet_count_state_send
-                                sta serial_packet_count_state 
+                                lda serial_packet_state 
+                                ani $ff-serial_packet_state_send
+                                sta serial_packet_state 
                                 stc 
                                 jmp serial_send_packet_end 
-serial_send_packet_ok2:         lda serial_packet_count_state 
-                                ori serial_packet_count_state_send
-                                sta serial_packet_count_state 
+serial_send_packet_ok2:         lda serial_packet_state 
+                                ori serial_packet_state_send
+                                sta serial_packet_state 
                                 stc 
 serial_send_packet_end:         pop h 
                                 pop b 
@@ -456,7 +441,7 @@ serial_get_input_state:     in serial_command_port                      ;10
                             ret 
 .endif 
 .if (debug_mode==true)
-serial_get_input_state:     mvi a,$00
+serial_get_input_state:     mvi a,$ff
                             ret 
 .endif 
 ;serial_get_output_state returns the state of the serial device output line 

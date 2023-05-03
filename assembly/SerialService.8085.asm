@@ -144,7 +144,7 @@ serial_request_terminal_char_get_retry: stc
 ;serial_line_initialize resets all serial packet support system 
 
 serial_line_initialize: call serial_configure
-                        mvi a,serial_packet_state_send+serial_packet_state_receive 
+                        mvi a,serial_packet_state_receive 
                         sta serial_packet_state 
                         ret 
 
@@ -253,6 +253,7 @@ serial_get_packet_acknowledge:  mov a,e
                                 mov c,a 
                                 mov a,e
                                 ani serial_packet_acknowledge_bit_mask
+                                stc 
                                 jz serial_get_packet_end
                                 mvi a,$ff 
 serial_get_packet_end:          pop h 

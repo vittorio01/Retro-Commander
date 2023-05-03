@@ -6,7 +6,7 @@
 ; header  ->    bit 7 -> ACK
 ;               bit 6 -> COUNT 
 ;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
-; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,checksum, start and stop bytes) 
+; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,start and stop bytes) 
 
 debug_mode      .var  false 
 
@@ -22,7 +22,7 @@ serial_state_output_line_mask   .equ %00000001
 
 serial_delay_value              .equ 16                 ;delay constant for byte wait functions 
                                                         ;serial_delay_value=(clk-31)/74 
-serial_wait_timeout_value       .equ 5000               ;resend timeout value (millis)
+serial_wait_timeout_value       .equ 2000               ;resend timeout value (millis)
 
 serial_packet_start_packet_byte         .equ $AA 
 serial_packet_stop_packet_byte          .equ $f0 
@@ -32,17 +32,17 @@ serial_packet_max_dimension             .equ 64
 serial_packet_acknowledge_bit_mask      .equ %10000000
 serial_packet_count_bit_mask            .equ %01000000
 
-serial_packet_resend_attempts           .equ 5 
+serial_packet_resend_attempts           .equ 3
 
-serial_command_reset_connection_byte    .equ $01
-serial_command_send_identifier_byte     .equ $02
+serial_command_reset_connection_byte    .equ $21
+serial_command_send_identifier_byte     .equ $22
 
-serial_command_send_terminal_char_byte          .equ $11
-serial_command_request_terminal_char_byte       .equ $12
+serial_command_send_terminal_char_byte          .equ $01
+serial_command_request_terminal_char_byte       .equ $02
 
-serial_command_get_disk_informations_byte       .equ $21 
-serial_command_write_disk_sector_byte           .equ $22
-serial_command_read_disk_sector_byte            .equ $23 
+serial_command_get_disk_informations_byte       .equ $11 
+serial_command_write_disk_sector_byte           .equ $12
+serial_command_read_disk_sector_byte            .equ $13 
 
 
 ;contains the count state of the two serial lines 
@@ -133,6 +133,9 @@ serial_request_terminal_char_get_retry: stc
                                         mov a,b 
                                         cpi serial_command_request_terminal_char_byte
                                         jnz serial_request_terminal_char_get_retry
+                                        mov a,c 
+                                        ora a 
+                                        jz serial_request_terminal_char_retry
                                         mov a,m 
                                         pop b 
                                         pop h 

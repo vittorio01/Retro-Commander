@@ -20,40 +20,46 @@ public class Packet {
     public static final byte startByte= (byte) 0b10101010;
     public static final byte stopByte= (byte) 0b11110000;
     public static final byte acknowledgeBitMask=(byte) 0b10000000;
-    public static final byte channelMask=(byte) 0b01100000;
-    public static final byte channelControlIdentifier=(byte) 0b00000000;
-    public static final byte channelDiskIdentifier=(byte) 0b00100000;
-    public static final byte channelTerminalIdentifier=(byte) 0b01000000;
-    public static final byte packetCountMask=(byte) 0b00010000;
-    public static final byte dimensionMask=(byte) 0b00001111;
+    public static final byte packetCountMask=(byte) 0b01000000;
+    public static final byte dimensionMask=(byte) 0b00111111;
     private boolean acknowledge;
-    private final channel channel;
+    private final byte command;
     private byte[] data;
-    public Packet(boolean acknowledge, channel channel) {
+    public Packet(boolean acknowledge) {
         this.acknowledge=acknowledge;
         data=null;
-        this.channel= channel;
+        command=0x00;
     }
-    public Packet(boolean acknowledge, channel channel, byte[] data) {
+    public Packet(boolean acknowledge, byte command, byte[] data) {
         this.acknowledge=acknowledge;
-        this.channel= channel;
+        this.command=command;
         if (!acknowledge) {
             this.data = data;
         } else {
             this.data=null;
         }
     }
-    public channel getChannel() {
-        return channel;
+    public byte getCommand() {
+        return command;
     }
     public byte[] getData() {
         return data;
     }
-    public boolean verifyChecksum(byte checksum) {
-        return getChecksum() == checksum;
+    public boolean verifyChecksum(byte checksum, boolean packetCount) {
+        return getChecksum(packetCount) == checksum;
     }
-    public byte getChecksum() {
+    public byte getChecksum(boolean packetCount) {
         byte sum=0;
+        if (acknowledge) {
+            sum=(byte)(sum + Packet.acknowledgeBitMask);
+        }
+        if (packetCount) {
+            sum=(byte)(sum + Packet.packetCountMask);
+        }
+        if (data!=null) {
+            sum=(byte)(sum + (data.length & dimensionMask));
+        }
+        sum=(byte)(sum+startByte+stopByte+command);
         if (data==null) return sum;
         for (byte b:data) {
             sum = (byte) ((sum+b)& 0xff);
@@ -62,19 +68,5 @@ public class Packet {
     }
     public boolean isAcknowledge() {
         return acknowledge;
-    }
-
-    @Override
-    public String toString() {
-        String output= "{ack=" + acknowledge + ", channel= " + channel + ", checksum= " + getChecksum() + "}\n";
-        if (data!=null) {
-            for (int i = 0; i < data.length; i++) {
-                output = output.concat(" " + data[i] + ",");
-                if (i % 16 == 0 && i != 0) {
-                    output = output.concat("\n");
-                }
-            }
-        }
-        return output.concat("\n");
     }
 }

@@ -1,7 +1,5 @@
 package retrocommander.retrocommander;
 
-import javafx.concurrent.Service;
-import javafx.concurrent.Task;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -17,7 +15,6 @@ import retrocommander.disk_creator.DiskCreator;
 import retrocommander.disk_emulator.DiskEmulator;
 import retrocommander.serial.Packet;
 import retrocommander.serial.SerialInterface;
-import retrocommander.serial.channel;
 
 import java.io.File;
 import java.io.IOException;
@@ -273,38 +270,38 @@ public class ConsoleController {
     In this configuration, the slave (the current computer) is used to provide a set of resources like I/O terminal and disk device.
     At this point, there are some assertions to establish:
     - The slave cannot send packets before the master. Every packet that the slave will send are anticipated by a command packet from the master.
-    - There are different channels for different type of commands:
-        * the channel terminal is used for sending and reading ASCII character
-        * the channel disk is used for performing sectors read/write operations
-        * the channel control is used for sending connection commands
+    - There are different type of commands:
+        * Terminal commands, used for sending and reading ASCII character
+        * Disk commands, used for performing disk operations
+        * Channel commands, used for controlling the connection
 
-    *** channel terminal ***
-    This channel provide commands for I/O terminal communications.
-    All possible transmissions can be:
-    -   Send command -> the master sends a number of ASCII characters
-        (command "send" byte )(ASCII characters to transmit)
+    *** Terminal ***
+    These commands are used for I/O terminal communications:
+    -   Send command -> the master sends an ASCII character
+        body -> (the ASCII character to transmit)
 
     -   Read command -> the master requests a certain number of ASCII characters from the slave
-        (command "read" byte )(number of characters to read)
-        When the slave receive the command packet, one or more packet constituted by ASCII characters will be transmitted.
+        body -> (void)
+        After the request, the slave sends a second packet which contains the ASCII char
+        body -> ASCII char (if the char is not available, the body will be obmitted)
     */
     public static final byte terminal_sendString= 0x01;
     public static final byte terminal_readRequest = 0x02;
     /*
-    *** channel disk **
-    This channel provide commands for disk operations.
-    All possible transmissions refers to one of these commands:
+    *** Disk **
+    These commands are used for all disk operations:
     -   get information -> the master requests the disk information.
-        (command "get informations" byte) (byte per sector)(sectors per track)(tracks per head)(number of heads)(disk state)
+        body -> byte per sector (1 byte coded in 128 multiples), sectors per track (one byte), tracks per head (two bytes), number of heads (one byte),disk state (one byte)
     -   read sector -> the master requests a transmission of one specified sector
-        (command "read sector" byte)(sector)(track)(head)
-        the slave responds with one or more packets containing the sector bytes
+        body -> sector number (one byte), track number (two bytes), head number (1 byte)
+        the slave responds sending the desired sector split in one or more packets
     -   write sector -> the master send a sector to the master (at least two packets)
-        (command "write sector" byte)(sector)(track)(head) --- (sector bytes) --- (sector bytes)
+        body -> sector number (one byte), track number (two bytes), head number (one byte)
+        After the request packet, the sector data is split into or more packets
      */
-    public static final byte disk_getInformation= 0x01;
-    public static final byte disk_readSector = 0x02;
-    public static final byte disk_writeSector = 0x03;
+    public static final byte disk_getInformation= 0x11;
+    public static final byte disk_readSector = 0x12;
+    public static final byte disk_writeSector = 0x13;
     public static final byte disk_insertedMask = (byte) 0b10000000;
     public static final byte disk_readyMask = (byte) 0b01000000;
     public static final byte disk_readOnlyMask = (byte) 0b00100000;
@@ -312,19 +309,15 @@ public class ConsoleController {
     public static final byte disk_seekErrorMask = (byte) 0b00001000;
     public static final byte disk_badSectorMask = (byte) 0b00000100;
     /*
-    *** channel control ***
-    this channel is used from the master to control the serial settings
-    All possible requests for control channel are:
-    -   open connection -> the master tells the slave that the communication will be started
-        (command "open connection byte)
-    -   close connection -> the master tells the slave that the communication will be closed
-        (command "close connection byte)
+    *** control ***
+    These command are used for sending information about the connection:
+    -   reset connection -> the master tells the slave that there is an hardware reset
+        body -> (void)
     -   board id -> the master sends a packet containing the board id
-        (command "board id" byte)(board id)
+        body -> board id char array)
     */
-    public static final byte control_openConnection = 0x01;
-    public static final byte control_closeConnection = 0x02;
-    public static final byte control_boardId = 0x03;
+    public static final byte control_resetConnection = 0x21;
+    public static final byte control_boardId = 0x22;
 
 
     boolean sectorTransferError;
@@ -343,23 +336,21 @@ public class ConsoleController {
         sectorTransferError=false;
         while (serialOn) {
             p = serialChannel.getPacket();
-            byte[] receivedCommand = p.getData();
-            switch (p.getChannel()) {
-                case control:
-                    if (receivedCommand[0] == control_openConnection) {
-                        masterConnectionOpened = true;
-                        logTextArea.appendText("The external device has started a new connection!\n");
-                    } else if (receivedCommand[0] == control_closeConnection) {
-                        logTextArea.appendText("The external device has closed the connection\n");
-                        masterConnectionOpened = false;
-                    } else if (receivedCommand[0] == control_boardId) {
-                        StringBuilder boardid = new StringBuilder();
-                        for (int i = 1; i < receivedCommand.length; i++) {
-                            boardid.append((char) receivedCommand[i]);
-                        }
-                        logTextArea.setText("The external device has sent his ID:" + boardid.toString() + "\n");
+            byte[] received_data=p.getData();
+            if (p.getCommand() == control_resetConnection) {
+                masterConnectionOpened = true;
+                logTextArea.appendText("The external device has started a new connection!\n");
+            } else if (p.getCommand() == control_boardId) {
+                StringBuilder boardid = new StringBuilder();
+                if (received_data!=null) {
+                    for (byte receivedDatum : received_data) {
+                        boardid.append((char) receivedDatum);
                     }
-                    break;
+                }
+                logTextArea.setText("The external device has sent his ID:" + boardid.toString() + "\n");
+            }
+
+                    /*
                 case disk:
                     if (receivedCommand[0] == disk_getInformation) {
                         byte[] response = new byte[6];
@@ -421,42 +412,40 @@ public class ConsoleController {
                     }
 
                     break;
-                case terminal:
-                    if (receivedCommand[0] == terminal_sendString) {
-                        for (int i = 1; i < receivedCommand.length; i++) {
-                            if (receivedCommand[i] >= (byte) 0x20 && receivedCommand[i] < (byte) 0x7f) {
-                                if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                                    terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) receivedCommand[i]));
-                                } else {
-                                    terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) receivedCommand[i]));
-                                }
-                            } else if (receivedCommand[i] == (byte) 0x0a) {
-                                terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
-                            } else if (receivedCommand[i] == (byte) 0x0d) {
-                                String s = "";
-                                if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                                    for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
-                                } else {
-                                    for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
-                                        s = s.concat(" ");
-                                }
-                                terminalTextArea.appendText(s);
-                            } else if (receivedCommand[i] == (byte) 0x08) {
-                                terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
-                            }
+
+                     */
+            if (p.getCommand() == terminal_sendString) {
+                for (int i = 0; i < received_data.length; i++) {
+                    if (received_data[i] >= (byte) 0x20 && received_data[i] < (byte) 0x7f) {
+                        if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                            terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) received_data[i]));
+                        } else {
+                            terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) received_data[i]));
                         }
-                    } else if (receivedCommand[0] == terminal_readRequest) {
-                        int charNumber = 0;
-                        byte[] asciiData = new byte[receivedCommand[1]];
-                        while (charNumber < receivedCommand[1] && !toSend.isEmpty()) {
-                            asciiData[charNumber] = (byte) toSend.remove().charValue();
-                            charNumber = charNumber + 1;
+                    } else if (received_data[i] == (byte) 0x0a) {
+                        terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
+                    } else if (received_data[i] == (byte) 0x0d) {
+                        String s = "";
+                        if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                            for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
+                        } else {
+                            for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
+                                s = s.concat(" ");
                         }
-                        byte[] asciiData2 = new byte[charNumber];
-                        System.arraycopy(asciiData, 0, asciiData2, 0, charNumber);
-                        serialChannel.sendPacket(new Packet(false, channel.terminal, asciiData2));
+                        terminalTextArea.appendText(s);
+                    } else if (received_data[i] == (byte) 0x08) {
+                        terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
                     }
-                    break;
+                }
+            } else if (p.getCommand() == terminal_readRequest) {
+                if (toSend.isEmpty()) {
+                    byte[] data=new byte[1];
+                    data[1]=(byte)(toSend.remove().charValue());
+                    serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
+                } else {
+                    serialChannel.sendPacket(new Packet(false, terminal_readRequest, null));
+                }
+
             }
             serialChannel.close();
         }

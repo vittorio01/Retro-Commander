@@ -16,7 +16,7 @@ public class SerialInterface {
     private final int baudrate;
     private final int parity;
     private final int flowControl;
-    public final int resendTimeout=0;
+    public final int resendTimeout=2000;
     public final int resendAttempts=3;
     private final SerialPort port;
     private byte sendBitCount;
@@ -57,10 +57,10 @@ public class SerialInterface {
         }
         int timeoutBackup = port.getReadTimeout();
         byte[] buffer = new byte[1];
-        channel packetChannel = channel.undefined;
         byte checksum;
         boolean acknowledge;
         byte bitCount;
+        byte command;
         try {
             while (true) {
                 if (port.readBytes(buffer, 1) <= 0) throw new SerialPortIOException("Timeout error");
@@ -68,13 +68,10 @@ public class SerialInterface {
                 port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, resendTimeout, 0);
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 acknowledge = (buffer[0] & Packet.acknowledgeBitMask) != 0;
-                switch (buffer[0] & Packet.channelMask) {
-                    case Packet.channelControlIdentifier -> packetChannel = channel.control;
-                    case Packet.channelDiskIdentifier -> packetChannel = channel.disk;
-                    case Packet.channelTerminalIdentifier -> packetChannel = channel.terminal;
-                }
                 bitCount= (byte) (buffer[0] & Packet.packetCountMask);
                 byte[] inputData = new byte[buffer[0] & Packet.dimensionMask];
+                if (port.readBytes(buffer, 1) <= 0) continue;
+                command = buffer[0];
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 checksum = buffer[0];
                 if (inputData.length != 0) {
@@ -85,10 +82,10 @@ public class SerialInterface {
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 if (buffer[0] != Packet.stopByte) continue;
                 port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, timeoutBackup, 0);
-                Packet receivedPacket = new Packet(acknowledge, packetChannel, inputData);
+                Packet receivedPacket = new Packet(acknowledge, command, inputData);
                 if (!acknowledge) {
-                    if (receivedPacket.verifyChecksum(checksum)) {
-                        sendPacket(new Packet(true,packetChannel));
+                    if (receivedPacket.verifyChecksum(checksum,bitCount!=0)) {
+                        sendPacket(new Packet(true));
                     } else {
                         continue;
                     }
@@ -120,33 +117,29 @@ public class SerialInterface {
     }
     public void sendPacket(Packet p) throws SerialPortIOException {
         int timeoutBackup=port.getReadTimeout();
-        byte[] buffer=new byte[4];
+        byte[] buffer=new byte[5];
         buffer[0]=Packet.startByte;
-        buffer[3]=Packet.stopByte;
-        switch (p.getChannel()) {
-            case control -> buffer[1]=Packet.channelControlIdentifier;
-            case disk -> buffer[1]=Packet.channelDiskIdentifier;
-            case terminal -> buffer[1]=Packet.channelTerminalIdentifier;
-        }
+        buffer[4]=Packet.stopByte;
         byte[] outputData=p.getData();
         if (outputData!=null) {
             buffer[1]= (byte) (buffer[1] | (byte) (outputData.length & Packet.dimensionMask));
         }
         if (p.isAcknowledge()) buffer[1]=(byte) (buffer[1] | Packet.acknowledgeBitMask);
         buffer[1]=(byte)(buffer[1]|sendBitCount);
-        buffer[2]=p.getChecksum();
+        buffer[2]=p.getCommand();
+        buffer[3]=p.getChecksum(sendBitCount!=0);
         boolean directive=false;
         port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING,resendTimeout,0);
         if (!p.isAcknowledge()) {
             for (int i = 0; i < resendAttempts; i++) {
-                port.writeBytes(buffer, 3);
+                port.writeBytes(buffer, 4);
                 if (outputData != null && outputData.length!=0) {
                     port.writeBytes(outputData, outputData.length);
                 }
-                port.writeBytes(buffer, 1, 3);
+                port.writeBytes(buffer, 1, 4);
                 try {
                     Packet temp=getPacket();
-                    if (temp.isAcknowledge() && temp.getChannel()==p.getChannel()) {
+                    if (temp.isAcknowledge()) {
                         directive = true;
                         break;
                     }

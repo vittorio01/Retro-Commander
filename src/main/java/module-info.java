@@ -6,7 +6,8 @@ module retrocommander.retrocommander {
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.bootstrapfx.core;
     requires com.fazecast.jSerialComm;
-
+    requires javafx.graphics;
+    requires javafx.base;
     opens retrocommander.retrocommander to javafx.fxml;
     opens retrocommander.disk_creator to javafx.fxml;
     exports retrocommander.retrocommander;

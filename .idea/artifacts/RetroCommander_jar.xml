@@ -16,28 +16,6 @@
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/openjfx/javafx-fxml/19/javafx-fxml-19-linux.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/openjfx/javafx-graphics/19/javafx-graphics-19-linux.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/openjfx/javafx-base/19/javafx-base-19-linux.jar" path-in-jar="/" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-graphics:linux:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-graphics:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-fxml:linux:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-fxml:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-controls:linux:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-controls:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-base:linux:19" />
-      <element id="library" level="project" name="Maven: org.openjfx:javafx-base:19" />
-      <element id="library" level="project" name="Maven: org.kordamp.ikonli:ikonli-javafx:12.3.1" />
-      <element id="library" level="project" name="Maven: org.kordamp.ikonli:ikonli-core:12.3.1" />
-      <element id="library" level="project" name="Maven: org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0" />
-      <element id="library" level="project" name="Maven: org.controlsfx:controlsfx:11.1.2" />
-      <element id="library" level="project" name="jSerialComm-2.9.3" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx-swt.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.base.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.controls.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.fxml.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.graphics.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.media.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.properties" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.swing.jar" />
-      <element id="file-copy" path="$PROJECT_DIR$/../javafx-sdk-20.0.1/lib/javafx.web.jar" />
     </root>
   </artifact>
 </component>

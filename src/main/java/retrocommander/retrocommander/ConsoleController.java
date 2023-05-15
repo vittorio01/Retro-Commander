@@ -1,5 +1,7 @@
 package retrocommander.retrocommander;
 
+import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -18,13 +20,15 @@ import retrocommander.serial.SerialInterface;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class ConsoleController {
     public static final int[] baudrates={300,600,2400,4800,9600,19200,38400,57600,115200};
-    public static final String[] parities={"None","Odd","Even"};
-    public static final String[] stopBits={"1","1.5","2"};
-    public static final String[] flowControls={"None","RTS/CTS","DTR/DSR"};
+    public static final int parity=SerialPort.NO_PARITY;
+    public static final int flowControl=SerialPort.FLOW_CONTROL_CTS_ENABLED | SerialPort.FLOW_CONTROL_RTS_ENABLED;
+    public static final int stopBits=SerialPort.ONE_STOP_BIT;
+
 
     public static final int line_dimension=64;
     public static final int line_tab_number=8;
@@ -40,24 +44,15 @@ public class ConsoleController {
     private Label targetPortLabel;
     @FXML
     private Label baudrateLabel;
+
     @FXML
-    private Label stopBitsLabel;
-    @FXML
-    private Label parityLabel;
-    @FXML
-    private TextField targetPortField;
+    private ComboBox<String> targetPortCombo;
     @FXML
     private ChoiceBox<Integer> baudrateChoice;
-    @FXML
-    private ChoiceBox<String> parityChoice;
-    @FXML
-    private ChoiceBox<String> stopBitsChoice;
+
     @FXML
     private CheckBox diskCheck;
-    @FXML
-    private ChoiceBox<String> flowControlChoice;
-    @FXML
-    private Label flowControlLabel;
+
     @FXML
     private TextArea logTextArea;
     @FXML
@@ -72,7 +67,9 @@ public class ConsoleController {
     File diskEmulationFile;
     SerialInterface serialChannel;
     int carriage;
-    private BlockingQueue<Character> toSend;
+    private BlockingQueue<Character> terminalSendQueue;
+    private BlockingQueue<Character> terminalReceiveQueue;
+    private BlockingQueue<String> logQueue;
     @FXML
     public void initialize() {
         diskCreatorOn=false;
@@ -84,21 +81,16 @@ public class ConsoleController {
         for (int baudrate : baudrates) {
             baudrateChoice.getItems().add(baudrate);
         }
-        for (String s : parities) {
-            parityChoice.getItems().add(s);
+        for (SerialPort p: SerialPort.getCommPorts()) {
+            targetPortCombo.getItems().add(p.getSystemPortName());
         }
-        for (String s : stopBits) {
-            stopBitsChoice.getItems().add(s);
-        }
-        for (String s:flowControls) {
-            flowControlChoice.getItems().add(s);
-        }
+        terminalSendQueue=new ArrayBlockingQueue<Character>(120);
 
     }
     @FXML
     private boolean checkOptions() {
         boolean result=true;
-        if (targetPortField.getText().equals("")) {
+        if (targetPortCombo.getValue().equals("")) {
             targetPortLabel.setTextFill(Paint.valueOf("RED"));
             result=false;
         } else {
@@ -109,24 +101,6 @@ public class ConsoleController {
             baudrateLabel.setTextFill(Paint.valueOf("RED"));
         } else {
             baudrateLabel.setTextFill(Paint.valueOf("BLACK"));
-        }
-        if (parityChoice.getValue()==null) {
-            result=false;
-            parityLabel.setTextFill(Paint.valueOf("RED"));
-        } else {
-            parityLabel.setTextFill(Paint.valueOf("BLACK"));
-        }
-        if (stopBitsChoice.getValue()==null) {
-            result=false;
-            stopBitsLabel.setTextFill(Paint.valueOf("RED"));
-        } else {
-            stopBitsLabel.setTextFill(Paint.valueOf("BLACK"));
-        }
-        if (flowControlChoice.getValue()==null) {
-            result=false;
-            flowControlLabel.setTextFill(Paint.valueOf("RED"));
-        } else {
-            flowControlLabel.setTextFill(Paint.valueOf("BLACK"));
         }
         return result;
     }
@@ -143,57 +117,33 @@ public class ConsoleController {
             errorLabel.setVisible(false);
             startButton.setText("Stop Communication");
             diskCheck.setDisable(true);
-            int parity=0;
-            int stopBit=0;
-            int flowControl=0;
-            if (parityChoice.getValue().equals(parities[0])) {
-                parity=SerialPort.NO_PARITY;
-            } else if (parityChoice.getValue().equals(parities[1])) {
-                parity=SerialPort.EVEN_PARITY;
-            } else if (parityChoice.getValue().equals(parities[2])) {
-                parity=SerialPort.ODD_PARITY;
-            }
-            if (stopBitsChoice.getValue().equals(stopBits[0])) {
-                stopBit=SerialPort.ONE_STOP_BIT;
-            } else if (stopBitsChoice.getValue().equals(stopBits[1])) {
-                stopBit=SerialPort.ONE_POINT_FIVE_STOP_BITS;
-            } else if (stopBitsChoice.getValue().equals(stopBits[2])) {
-                stopBit=SerialPort.TWO_STOP_BITS;
-            }
-            if (flowControlChoice.getValue().equals(flowControls[0])) {
-                flowControl=SerialPort.FLOW_CONTROL_DISABLED;
-            } else if (flowControlChoice.getValue().equals(flowControls[1])) {
-                flowControl=SerialPort.FLOW_CONTROL_RTS_ENABLED | SerialPort.FLOW_CONTROL_CTS_ENABLED;
-            } else if (flowControlChoice.getValue().equals(flowControls[2])) {
-                flowControl=SerialPort.FLOW_CONTROL_DSR_ENABLED | SerialPort.FLOW_CONTROL_DTR_ENABLED;
-            } else if (flowControlChoice.getValue().equals(flowControls[3])) {
-                flowControl=SerialPort.FLOW_CONTROL_XONXOFF_IN_ENABLED | SerialPort.FLOW_CONTROL_XONXOFF_OUT_ENABLED;
-            }
-
             logTextArea.appendText("Starting serial connection... \n");
-
-            int finalStopBit = stopBit;
-            int finalParity = parity;
-            int finalFlowControl = flowControl;
-            Thread connection= new Thread(() -> {
-                try {
-                    if (diskEmulationOn) {
-                        connect(targetPortField.getText(), finalStopBit, baudrateChoice.getValue(), finalParity, finalFlowControl, diskEmulationOn, diskEmulationFile.getPath());
-                    } else {
-                        connect(targetPortField.getText(), finalStopBit, baudrateChoice.getValue(), finalParity, finalFlowControl, diskEmulationOn, null);
+            Thread serialConnection=new Thread(new Task<Void>() {
+                @Override
+                protected Void call() throws Exception {
+                    try {
+                        if (diskEmulationOn) {
+                            connect(targetPortCombo.getValue(), stopBits, baudrateChoice.getValue(), parity, flowControl, diskEmulationOn, diskEmulationFile.getPath());
+                        } else {
+                            connect(targetPortCombo.getValue(), stopBits, baudrateChoice.getValue(), parity, flowControl, diskEmulationOn, null);
+                        }
+                    } catch (Exception e) {
+                        if (serialChannel!=null) {
+                            serialChannel.close();
+                        }
+                        Platform.runLater(() -> {
+                            logTextArea.appendText("Fatal error: "+e.getMessage() + "\nConnection Closed\n");
+                            startButton.setText("Start Communication");
+                            diskCheck.setDisable(false);
+                        });
+                        serialOn = false;
                     }
-                } catch (Exception e) {
-                    if (serialChannel!=null) {
-                        serialChannel.close();
-                    }
-                    logTextArea.appendText("Fatal error: "+e.getMessage() + "\nConnection Closed\n");
-                    serialOn = false;
-                    startButton.setText("Start Communication");
-                    diskCheck.setDisable(false);
+                    return null;
                 }
             });
-            connection.setDaemon(true);
-            connection.start();
+            serialConnection.setDaemon(true);
+            serialConnection.start();
+
         } else {
             serialOn=false;
             diskCheck.setDisable(false);
@@ -207,6 +157,7 @@ public class ConsoleController {
     @FXML
     private void launchDiskCreator() throws IOException {
         if (!diskCreatorOn) {
+
             diskCreatorOn=true;
             Stage stage=new Stage();
             FXMLLoader fxmlLoader = new FXMLLoader(DiskCreator.class.getResource("disk_creator.fxml"));
@@ -227,7 +178,7 @@ public class ConsoleController {
     @FXML
     private void sendCharacter(KeyEvent event) {
         if (serialOn && masterConnectionOpened) {
-            toSend.add(event.getCode().getChar().charAt(0));
+            terminalSendQueue.add(event.getCode().getChar().charAt(0));
         }
     }
     @FXML
@@ -330,16 +281,18 @@ public class ConsoleController {
         }
         serialChannel = new SerialInterface(serialPortName, stopBits,baudrate, parity, flowControl);
         serialChannel.open();
-        logTextArea.appendText("Connection opened correctly \n");
+        Platform.runLater(() -> logTextArea.appendText("Serial device opened Correctly!\n"));
         Packet p;
         sectorSeekError=false;
         sectorTransferError=false;
         while (serialOn) {
-            p = serialChannel.getPacket();
+            p = serialChannel.getPacket(false);
+
             byte[] received_data=p.getData();
             if (p.getCommand() == control_resetConnection) {
                 masterConnectionOpened = true;
-                logTextArea.appendText("The external device has started a new connection!\n");
+                Platform.runLater(() -> logTextArea.appendText("The external device has started a new connection!\n"));
+
             } else if (p.getCommand() == control_boardId) {
                 StringBuilder boardid = new StringBuilder();
                 if (received_data!=null) {
@@ -347,7 +300,8 @@ public class ConsoleController {
                         boardid.append((char) receivedDatum);
                     }
                 }
-                logTextArea.setText("The external device has sent his ID:" + boardid.toString() + "\n");
+                Platform.runLater(() -> logTextArea.setText("The external device has sent his ID:" + boardid + "\n"));
+
             }
 
                     /*
@@ -414,7 +368,7 @@ public class ConsoleController {
                     break;
 
                      */
-            if (p.getCommand() == terminal_sendString) {
+            /*if (p.getCommand() == terminal_sendString) {
                 for (int i = 0; i < received_data.length; i++) {
                     if (received_data[i] >= (byte) 0x20 && received_data[i] < (byte) 0x7f) {
                         if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
@@ -438,16 +392,18 @@ public class ConsoleController {
                     }
                 }
             } else if (p.getCommand() == terminal_readRequest) {
-                if (toSend.isEmpty()) {
+                if (terminalSendQueue.isEmpty()) {
                     byte[] data=new byte[1];
-                    data[1]=(byte)(toSend.remove().charValue());
+                    data[1]=(byte)(terminalSendQueue.remove().charValue());
                     serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
                 } else {
                     serialChannel.sendPacket(new Packet(false, terminal_readRequest, null));
                 }
 
             }
-            serialChannel.close();
+            */
         }
+        serialChannel.close();
+
     }
 }

@@ -2,6 +2,7 @@ package retrocommander.serial;
 import com.fazecast.jSerialComm.*;
 
 
+
 public class SerialInterface {
     /*
     The transmission interface is used for communicating with connected device. This class implements the algorithm for managing transmissions and
@@ -16,7 +17,7 @@ public class SerialInterface {
     private final int baudrate;
     private final int parity;
     private final int flowControl;
-    public final int resendTimeout=2000;
+    public final int resendTimeout=10000;
     public final int resendAttempts=3;
     private final SerialPort port;
     private byte sendBitCount;
@@ -24,7 +25,7 @@ public class SerialInterface {
     private boolean startSendBitCount;
     private boolean startReceiveBitCount;
 
-    public SerialInterface(String serialPortName, int stopBits, int baudrate, int parity, int flowControl) throws SerialPortIOException, SerialPortInvalidPortException {
+    public SerialInterface(String serialPortName, int stopBits, int baudrate, int parity, int flowControl) throws SerialPortInvalidPortException {
         port=SerialPort.getCommPort(serialPortName);
         this.stopBits=stopBits;
         this.baudrate=baudrate;
@@ -35,7 +36,7 @@ public class SerialInterface {
 
         port.setComPortParameters(baudrate,8,stopBits,parity,false);
         port.setFlowControl(flowControl);
-        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING,0,0);
+        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING,0,0);
         if (!port.openPort()) throw new SerialPortIOException("Error opening serial device");
         startSendBitCount=false;
         startReceiveBitCount=false;
@@ -51,11 +52,8 @@ public class SerialInterface {
         port.closePort();
     }
 
-    public Packet getPacket() throws SerialPortIOException {
-        if (flowControl==(SerialPort.FLOW_CONTROL_RTS_ENABLED | SerialPort.FLOW_CONTROL_CTS_ENABLED)) {
-            port.setRTS();
-        }
-        int timeoutBackup = port.getReadTimeout();
+    public Packet getPacket(boolean timeout) throws SerialPortIOException {
+        port.setRTS();
         byte[] buffer = new byte[1];
         byte checksum;
         boolean acknowledge;
@@ -63,60 +61,84 @@ public class SerialInterface {
         byte command;
         try {
             while (true) {
-                if (port.readBytes(buffer, 1) <= 0) throw new SerialPortIOException("Timeout error");
+                if (timeout) {
+                    port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING,resendTimeout,0);
+                } else {
+                    port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 0, 0);
+                }
+                port.flushIOBuffers();
+                if (port.readBytes(buffer, 1) < 0) {
+                    throw new SerialPortIOException("Timeout error");
+                }
+                System.out.println("Received a byte from the serial line");
                 if (buffer[0] != Packet.startByte) continue;
+
                 port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, resendTimeout, 0);
+
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 acknowledge = (buffer[0] & Packet.acknowledgeBitMask) != 0;
                 bitCount= (byte) (buffer[0] & Packet.packetCountMask);
-                byte[] inputData = new byte[buffer[0] & Packet.dimensionMask];
+
+                byte[] inputData = null;
+                if ((buffer[0] & Packet.dimensionMask)!=0) inputData=new byte[buffer[0] & Packet.dimensionMask];
+
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 command = buffer[0];
+
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 checksum = buffer[0];
-                if (inputData.length != 0) {
-                    for (int i = 0; i < inputData.length; i++) {
-                        if (port.readBytes(inputData, 1, i) <= 0) continue;
+
+                if (inputData != null) {
+                    int dataNumber;
+                    for (dataNumber = 0; dataNumber < inputData.length; dataNumber++) {
+                        if (port.readBytes(inputData, 1, dataNumber) <= 0) break;
                     }
+                    if (dataNumber < inputData.length) continue;
                 }
+
                 if (port.readBytes(buffer, 1) <= 0) continue;
                 if (buffer[0] != Packet.stopByte) continue;
-                port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, timeoutBackup, 0);
+
                 Packet receivedPacket = new Packet(acknowledge, command, inputData);
+                if (!receivedPacket.verifyChecksum(checksum,bitCount!=0)) continue;
+                System.out.println("The received data is a valid packet !");
                 if (!acknowledge) {
-                    if (receivedPacket.verifyChecksum(checksum,bitCount!=0)) {
+                    try {
                         sendPacket(new Packet(true));
-                    } else {
-                        continue;
+
+                    } catch (SerialPortIOException e) {
+                        System.out.println("Error during ACK sending: "+e.getMessage());
                     }
                 }
                 if (!startReceiveBitCount) {
                     receiveBitCount=bitCount;
                     startReceiveBitCount=true;
-                    if (flowControl == (SerialPort.FLOW_CONTROL_RTS_ENABLED | SerialPort.FLOW_CONTROL_CTS_ENABLED)) {
-                        port.clearRTS();
-                    }
+                    port.clearRTS();
+                    System.out.println("---> Packet Received from master: "+receivedPacket);
                     return receivedPacket;
                 } else {
                     if (receiveBitCount!=bitCount) {
                         receiveBitCount=bitCount;
-                        if (flowControl == (SerialPort.FLOW_CONTROL_RTS_ENABLED | SerialPort.FLOW_CONTROL_CTS_ENABLED)) {
-                            port.clearRTS();
-                        }
+                        port.clearRTS();
+                        System.out.println("---> Packet Received from master: "+receivedPacket);
                         return receivedPacket;
                     }
                 }
+                System.out.println("This packet is already received");
+
+
 
             }
         } catch (SerialPortIOException e) {
-            if (flowControl==(SerialPort.FLOW_CONTROL_RTS_ENABLED | SerialPort.FLOW_CONTROL_CTS_ENABLED)) {
-                port.clearRTS();
-            }
+            port.clearRTS();
             throw e;
         }
     }
     public void sendPacket(Packet p) throws SerialPortIOException {
-        int timeoutBackup=port.getReadTimeout();
+        if (!startSendBitCount) {
+            startSendBitCount = true;
+            sendBitCount=0x00;
+        }
         byte[] buffer=new byte[5];
         buffer[0]=Packet.startByte;
         buffer[4]=Packet.stopByte;
@@ -129,38 +151,41 @@ public class SerialInterface {
         buffer[2]=p.getCommand();
         buffer[3]=p.getChecksum(sendBitCount!=0);
         boolean directive=false;
-        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING,resendTimeout,0);
         if (!p.isAcknowledge()) {
             for (int i = 0; i < resendAttempts; i++) {
-                port.writeBytes(buffer, 4);
+                port.writeBytes(buffer, 5);
+
                 if (outputData != null && outputData.length!=0) {
                     port.writeBytes(outputData, outputData.length);
                 }
+
                 port.writeBytes(buffer, 1, 4);
+                System.out.println("Packet sent to serial line");
                 try {
-                    Packet temp=getPacket();
+                    System.out.println("Waiting an ACK from the master");
+                    Packet temp=getPacket(true);
                     if (temp.isAcknowledge()) {
                         directive = true;
                         break;
                     }
                 } catch (SerialPortIOException e) {
                     if (!e.getMessage().equals("Timeout error")) {
-                        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, timeoutBackup, 0);
                         throw e;
                     }
                 }
             }
             if (!directive) {
+                System.out.println("All resend attempts comsumed");
                 throw new SerialPortIOException("All resend attempts consumed");
             }
+            System.out.println("---> packet sent to master: "+p);
         } else {
-            port.writeBytes(buffer, 4);
+            port.writeBytes(buffer, 5);
+            System.out.println("ACK sent to master");
         }
-        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, timeoutBackup, 0);
-        if (!startSendBitCount) {
-            startSendBitCount=true;
-        }
-        sendBitCount= (byte) ((byte)(sendBitCount^0xff) & Packet.packetCountMask);
+        sendBitCount = (byte) ((byte) (sendBitCount ^ 0xff) & Packet.packetCountMask);
+
+
     }
 
 }

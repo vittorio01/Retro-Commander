@@ -16,7 +16,6 @@
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/openjfx/javafx-fxml/19/javafx-fxml-19-linux.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/openjfx/javafx-graphics/19/javafx-graphics-19-linux.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/openjfx/javafx-base/19/javafx-base-19-linux.jar" path-in-jar="/" />
-      <element id="library" level="project" name="jSerialComm-2.9.3" />
       <element id="library" level="project" name="Maven: org.controlsfx:controlsfx:11.1.2" />
       <element id="library" level="project" name="Maven: org.kordamp.ikonli:ikonli-core:12.3.1" />
       <element id="library" level="project" name="Maven: org.kordamp.ikonli:ikonli-javafx:12.3.1" />

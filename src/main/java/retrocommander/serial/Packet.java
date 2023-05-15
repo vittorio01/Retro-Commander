@@ -1,5 +1,7 @@
 package retrocommander.serial;
 
+import java.util.Arrays;
+
 public class Packet {
     /*
     A serial packet is composed with multiple bytes with different functions:
@@ -68,5 +70,14 @@ public class Packet {
     }
     public boolean isAcknowledge() {
         return acknowledge;
+    }
+
+    @Override
+    public String toString() {
+        return "{" +
+                "acknowledge=" + acknowledge +
+                ", command=" + String.format("%02X",command) +
+                ", data=" + Arrays.toString(data) +
+                '}';
     }
 }

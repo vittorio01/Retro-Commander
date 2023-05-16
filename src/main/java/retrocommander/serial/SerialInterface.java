@@ -33,7 +33,6 @@ public class SerialInterface {
         this.flowControl=flowControl;
     }
     public void open() throws SerialPortIOException {
-
         port.setComPortParameters(baudrate,8,stopBits,parity,false);
         port.setFlowControl(flowControl);
         port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING,0,0);
@@ -41,14 +40,10 @@ public class SerialInterface {
         startSendBitCount=false;
         startReceiveBitCount=false;
         sendBitCount=0;
-        if (flowControl==(SerialPort.FLOW_CONTROL_DTR_ENABLED | SerialPort.FLOW_CONTROL_DSR_ENABLED)) {
-            port.setDTR();
-        }
+        port.setDTR();
     }
     public void close() {
-        if (flowControl==(SerialPort.FLOW_CONTROL_DTR_ENABLED | SerialPort.FLOW_CONTROL_DSR_ENABLED)) {
-            port.clearDTR();
-        }
+        port.clearDTR();
         port.closePort();
     }
 
@@ -186,6 +181,11 @@ public class SerialInterface {
         sendBitCount = (byte) ((byte) (sendBitCount ^ 0xff) & Packet.packetCountMask);
 
 
+    }
+    public void resetConnection() {
+        startSendBitCount=false;
+        startReceiveBitCount=false;
+        sendBitCount=0;
     }
 
 }

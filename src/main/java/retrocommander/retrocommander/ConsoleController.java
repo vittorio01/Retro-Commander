@@ -68,8 +68,7 @@ public class ConsoleController {
     SerialInterface serialChannel;
     int carriage;
     private BlockingQueue<Character> terminalSendQueue;
-    private BlockingQueue<Character> terminalReceiveQueue;
-    private BlockingQueue<String> logQueue;
+
     @FXML
     public void initialize() {
         diskCreatorOn=false;
@@ -123,9 +122,9 @@ public class ConsoleController {
                 protected Void call() throws Exception {
                     try {
                         if (diskEmulationOn) {
-                            connect(targetPortCombo.getValue(), stopBits, baudrateChoice.getValue(), parity, flowControl, diskEmulationOn, diskEmulationFile.getPath());
+                            connect(targetPortCombo.getValue(), baudrateChoice.getValue(), diskEmulationOn, diskEmulationFile.getPath());
                         } else {
-                            connect(targetPortCombo.getValue(), stopBits, baudrateChoice.getValue(), parity, flowControl, diskEmulationOn, null);
+                            connect(targetPortCombo.getValue(), baudrateChoice.getValue(), diskEmulationOn, null);
                         }
                     } catch (Exception e) {
                         if (serialChannel!=null) {
@@ -273,13 +272,13 @@ public class ConsoleController {
 
     boolean sectorTransferError;
     boolean sectorSeekError;
-    private void connect(String serialPortName, int stopBits, int baudrate, int parity, int flowControl, boolean bindDisk,String diskFile) throws Exception {
+    private void connect(String serialPortName, int baudrate, boolean bindDisk, String diskFile) throws Exception {
 
         DiskEmulator disk=null;
         if (bindDisk) {
             disk=new DiskEmulator(diskFile);
         }
-        serialChannel = new SerialInterface(serialPortName, stopBits,baudrate, parity, flowControl);
+        serialChannel = new SerialInterface(serialPortName, ConsoleController.stopBits,baudrate, ConsoleController.parity, ConsoleController.flowControl);
         serialChannel.open();
         Platform.runLater(() -> logTextArea.appendText("Serial device opened Correctly!\n"));
         Packet p;
@@ -289,21 +288,61 @@ public class ConsoleController {
             p = serialChannel.getPacket(false);
 
             byte[] received_data=p.getData();
-            if (p.getCommand() == control_resetConnection) {
-                masterConnectionOpened = true;
-                Platform.runLater(() -> logTextArea.appendText("The external device has started a new connection!\n"));
+            switch (p.getCommand()) {
+                case control_resetConnection:
+                    masterConnectionOpened = true;
+                    serialChannel.resetConnection();
+                    Platform.runLater(() -> logTextArea.appendText("The external device has started a new connection!\n"));
+                    break;
 
-            } else if (p.getCommand() == control_boardId) {
-                StringBuilder boardid = new StringBuilder();
-                if (received_data!=null) {
-                    for (byte receivedDatum : received_data) {
-                        boardid.append((char) receivedDatum);
+                case control_boardId:
+                    StringBuilder boardid = new StringBuilder();
+                    if (received_data!=null) {
+                        for (byte receivedDatum : received_data) {
+                            boardid.append((char) receivedDatum);
+                        }
                     }
-                }
-                Platform.runLater(() -> logTextArea.setText("The external device has sent his ID:" + boardid + "\n"));
+                    Platform.runLater(() -> logTextArea.setText("The external device has sent his ID:" + boardid + "\n"));
+                    break;
+
+                case terminal_sendString:
+                    Platform.runLater(() -> {
+                        for (byte b : received_data) {
+                            if (b >= (byte) 0x20 && b < (byte) 0x7f) {
+                                if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                                    terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) b));
+                                } else {
+                                    terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) b));
+                                }
+                            } else if (b == (byte) 0x0a) {
+                                terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
+                            } else if (b == (byte) 0x0d) {
+                                String s = "";
+                                if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                                    for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
+                                } else {
+                                    for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
+                                        s = s.concat(" ");
+                                }
+                                terminalTextArea.appendText(s);
+                            } else if (b == (byte) 0x08) {
+                                terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
+                            }
+                        }
+                    });
+
+                    break;
+                case terminal_readRequest:
+                    if (terminalSendQueue.isEmpty()) {
+                        byte[] data=new byte[1];
+                        data[0]=(byte)(terminalSendQueue.remove().charValue());
+                        serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
+                    } else {
+                        serialChannel.sendPacket(new Packet(false, terminal_readRequest, null));
+                    }
+                    break;
 
             }
-
                     /*
                 case disk:
                     if (receivedCommand[0] == disk_getInformation) {
@@ -368,40 +407,8 @@ public class ConsoleController {
                     break;
 
                      */
-            /*if (p.getCommand() == terminal_sendString) {
-                for (int i = 0; i < received_data.length; i++) {
-                    if (received_data[i] >= (byte) 0x20 && received_data[i] < (byte) 0x7f) {
-                        if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                            terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) received_data[i]));
-                        } else {
-                            terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) received_data[i]));
-                        }
-                    } else if (received_data[i] == (byte) 0x0a) {
-                        terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
-                    } else if (received_data[i] == (byte) 0x0d) {
-                        String s = "";
-                        if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                            for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
-                        } else {
-                            for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
-                                s = s.concat(" ");
-                        }
-                        terminalTextArea.appendText(s);
-                    } else if (received_data[i] == (byte) 0x08) {
-                        terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
-                    }
-                }
-            } else if (p.getCommand() == terminal_readRequest) {
-                if (terminalSendQueue.isEmpty()) {
-                    byte[] data=new byte[1];
-                    data[1]=(byte)(terminalSendQueue.remove().charValue());
-                    serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
-                } else {
-                    serialChannel.sendPacket(new Packet(false, terminal_readRequest, null));
-                }
 
-            }
-            */
+
         }
         serialChannel.close();
 

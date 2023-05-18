@@ -8,7 +8,7 @@
 ;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
 ; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,start and stop bytes) 
 
-debug_mode      .var  false 
+debug_mode      .var  true 
 
 start_address                           .equ    $8000 
 serial_packet_state                     .equ    $0200
@@ -48,9 +48,8 @@ serial_command_read_disk_sector_byte            .equ $13
 ;contains the count state of the two serial lines 
 ; bit 8 -> send count 
 ; bit 7 -> receive count   
-serial_packet_state_send          .equ %10000000
-serial_packet_state_receive       .equ %01000000
-serial_packet_connection_reset    .equ %00100000
+serial_packet_line_state          .equ %10000000
+serial_packet_connection_reset    .equ %01000000
 
 begin:  .org start_address
         jmp  start
@@ -144,7 +143,7 @@ serial_request_terminal_char_get_retry: stc
 ;serial_line_initialize resets all serial packet support system 
 
 serial_line_initialize: call serial_configure
-                        mvi a,serial_packet_state_receive 
+                        xra a  
                         sta serial_packet_state 
                         ret 
 
@@ -233,20 +232,27 @@ serial_get_packet_received:     mov b,c
                                 call serial_send_packet
                                 pop b  
 serial_get_packet_count_check:  lda serial_packet_state
-                                ani serial_packet_state_receive 
+                                ani serial_packet_line_state  
                                 jz serial_get_packet_count_check2
                                 mov a,e 
                                 ani serial_packet_count_bit_mask
-                                jnz serial_get_packet_retry
-                                lda serial_packet_state
-                                ani $ff-serial_packet_state_receive
-                                sta serial_packet_state 
-                                jmp serial_get_packet_acknowledge
+                                jz serial_get_packet_retry
+                                mov a,e 
+                                ani serial_packet_acknowledge_bit_mask
+                                jnz serial_get_packet_acknowledge
+                                jmp serial_get_packet_count_switch
 serial_get_packet_count_check2: mov a,e 
                                 ani serial_packet_count_bit_mask
-                                jz serial_get_packet_retry
-                                lda serial_packet_state
-                                ori serial_packet_state_receive
+                                jnz serial_get_packet_retry
+                                mov a,e 
+                                ani serial_packet_acknowledge_bit_mask
+                                jnz serial_get_packet_acknowledge
+serial_get_packet_count_switch: lda serial_packet_state
+                                xri $ff 
+                                ani serial_packet_line_state
+                                mov d,a 
+                                lda serial_packet_state 
+                                ora d 
                                 sta serial_packet_state 
 serial_get_packet_acknowledge:  mov a,e 
                                 ani serial_packet_dimension_mask
@@ -286,7 +292,7 @@ serial_send_packet_init:        mov a,c
                                 ani serial_packet_dimension_mask
                                 mov c,a 
 serial_send_packet_init2:       lda serial_packet_state 
-                                ani serial_packet_state_send
+                                ani serial_packet_line_state 
                                 jz serial_send_packet2
                                 mov a,c 
                                 ori serial_packet_count_bit_mask
@@ -346,7 +352,7 @@ serial_send_packet_send_stop:   mvi a,serial_packet_stop_packet_byte
                                 call serial_send_new_byte
                                 mov a,c 
                                 ani serial_packet_acknowledge_bit_mask
-                                jnz serial_send_packet_ok
+                                jnz serial_send_packet_end2
                                 push b 
                                 lxi h,$ffff-serial_packet_max_dimension+1
                                 dad sp 
@@ -362,17 +368,17 @@ serial_send_packet_send_retry:  dcr b
                                 cmc 
                                 jmp serial_send_packet_end
 serial_send_packet_ok:          lda serial_packet_state 
-                                ani serial_packet_state_send
+                                ani serial_packet_line_state 
                                 jz serial_send_packet_ok2
                                 lda serial_packet_state 
-                                ani $ff-serial_packet_state_send
+                                ani $ff-serial_packet_line_state 
                                 sta serial_packet_state 
                                 stc 
                                 jmp serial_send_packet_end 
 serial_send_packet_ok2:         lda serial_packet_state 
-                                ori serial_packet_state_send
+                                ori serial_packet_line_state 
                                 sta serial_packet_state 
-                                stc 
+serial_send_packet_end2:        stc 
 serial_send_packet_end:         pop h 
                                 pop b 
                                 pop d 

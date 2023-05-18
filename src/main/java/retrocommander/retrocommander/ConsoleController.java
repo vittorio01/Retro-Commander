@@ -58,7 +58,7 @@ public class ConsoleController {
     @FXML
     private TabPane tabPane;
     @FXML
-    private Label errorLabel;
+    private Label connectionLabel;
     private static boolean diskCreatorOn;
     private boolean serialOn;
     private boolean masterConnectionOpened;
@@ -68,7 +68,7 @@ public class ConsoleController {
     SerialInterface serialChannel;
     int carriage;
     private BlockingQueue<Character> terminalSendQueue;
-
+    private Thread serialConnection;
     @FXML
     public void initialize() {
         diskCreatorOn=false;
@@ -83,6 +83,10 @@ public class ConsoleController {
         for (SerialPort p: SerialPort.getCommPorts()) {
             targetPortCombo.getItems().add(p.getSystemPortName());
         }
+        if (!targetPortCombo.getItems().isEmpty()) {
+            targetPortCombo.setValue(targetPortCombo.getItems().get(0));
+        }
+        baudrateChoice.setValue(baudrates[0]);
         terminalSendQueue=new ArrayBlockingQueue<Character>(120);
 
     }
@@ -107,17 +111,19 @@ public class ConsoleController {
     private void startCommunication() {
         if (!serialOn) {
             if(!checkOptions()) {
-                errorLabel.setText("Invalid port settings");
-                errorLabel.setVisible(true);
+                connectionLabel.setText("Invalid port settings");
+                connectionLabel.setVisible(true);
+                connectionLabel.setTextFill(Paint.valueOf("RED"));
                 return;
 
             }
             serialOn=true;
-            errorLabel.setVisible(false);
+            connectionLabel.setVisible(false);
+            connectionLabel.setTextFill(Paint.valueOf("BLACK"));
             startButton.setText("Stop Communication");
             diskCheck.setDisable(true);
             logTextArea.appendText("Starting serial connection... \n");
-            Thread serialConnection=new Thread(new Task<Void>() {
+            serialConnection=new Thread(new Task<Void>() {
                 @Override
                 protected Void call() throws Exception {
                     try {
@@ -130,11 +136,17 @@ public class ConsoleController {
                         if (serialChannel!=null) {
                             serialChannel.close();
                         }
-                        Platform.runLater(() -> {
-                            logTextArea.appendText("Fatal error: "+e.getMessage() + "\nConnection Closed\n");
-                            startButton.setText("Start Communication");
-                            diskCheck.setDisable(false);
-                        });
+                        if (!e.getMessage().equals("Timeout error")) {
+                            Platform.runLater(() -> {
+                                logTextArea.appendText("Fatal error: "+e.getMessage() + "\nConnection Closed\n");
+                                connectionLabel.setVisible(true);
+                                connectionLabel.setTextFill(Paint.valueOf("RED"));
+                                connectionLabel.setText("Connection closed");
+                                startButton.setText("Start Communication");
+                                diskCheck.setDisable(false);
+                            });
+                        }
+
                         serialOn = false;
                     }
                     return null;
@@ -144,11 +156,13 @@ public class ConsoleController {
             serialConnection.start();
 
         } else {
+            serialChannel.close();
             serialOn=false;
+            logTextArea.appendText("Closing Serial connection... \n");
             diskCheck.setDisable(false);
             masterConnectionOpened=false;
             startButton.setText("Start Communication");
-            logTextArea.appendText("Closing Serial connection... \n");
+
         }
 
     }
@@ -164,12 +178,7 @@ public class ConsoleController {
             stage.setTitle("Disk Creation Tool");
             stage.setResizable(false);
             stage.setScene(scene);
-            stage.setOnCloseRequest(new EventHandler<WindowEvent>() {
-                @Override
-                public void handle(WindowEvent event) {
-                    diskCreatorOn=false;
-                }
-            });
+            stage.setOnCloseRequest(event -> diskCreatorOn=false);
             stage.show();
         }
 
@@ -233,7 +242,7 @@ public class ConsoleController {
     -   Read command -> the master requests a certain number of ASCII characters from the slave
         body -> (void)
         After the request, the slave sends a second packet which contains the ASCII char
-        body -> ASCII char (if the char is not available, the body will be obmitted)
+        body -> ASCII char (if the char is not available, the body will be omitted)
     */
     public static final byte terminal_sendString= 0x01;
     public static final byte terminal_readRequest = 0x02;
@@ -290,19 +299,27 @@ public class ConsoleController {
             byte[] received_data=p.getData();
             switch (p.getCommand()) {
                 case control_resetConnection:
-                    masterConnectionOpened = true;
-                    serialChannel.resetConnection();
-                    Platform.runLater(() -> logTextArea.appendText("The external device has started a new connection!\n"));
+                    Platform.runLater(() -> {
+                        logTextArea.appendText("The external device has started a new connection!\n");
+                        connectionLabel.setVisible(true);
+                        connectionLabel.setTextFill(Paint.valueOf("BLACK"));
+                        connectionLabel.setText("Connected: unknown");
+                    });
                     break;
 
                 case control_boardId:
                     StringBuilder boardid = new StringBuilder();
                     if (received_data!=null) {
-                        for (byte receivedDatum : received_data) {
-                            boardid.append((char) receivedDatum);
+                        for (byte b : received_data) {
+                            boardid.append((char) b);
                         }
                     }
-                    Platform.runLater(() -> logTextArea.setText("The external device has sent his ID:" + boardid + "\n"));
+                    Platform.runLater(() -> {
+                        logTextArea.setText("The external device has sent his ID:" + boardid + "\n");
+                        connectionLabel.setVisible(true);
+                        connectionLabel.setTextFill(Paint.valueOf("BLACK"));
+                        connectionLabel.setText("Connected: "+boardid);
+                    });
                     break;
 
                 case terminal_sendString:
@@ -411,6 +428,6 @@ public class ConsoleController {
 
         }
         serialChannel.close();
-
+        Platform.runLater(() -> connectionLabel.setVisible(false));
     }
 }

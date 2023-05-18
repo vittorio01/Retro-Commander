@@ -34,7 +34,7 @@
                                 <items>
                                     <Button fx:id="startButton" mnemonicParsing="false" onAction="#startCommunication" text="Start Communication" />
                                     <Button fx:id="clearButton" mnemonicParsing="false" onAction="#clearTerminal" text="Clear" />
-                                    <Label fx:id="errorLabel" prefHeight="16.0" prefWidth="200.0" text="test" textFill="RED" visible="false">
+                                    <Label fx:id="connectionLabel" alignment="CENTER" prefHeight="24.0" prefWidth="213.0" text="test" textAlignment="CENTER" textFill="RED" visible="false">
                                        <padding>
                                           <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </padding>

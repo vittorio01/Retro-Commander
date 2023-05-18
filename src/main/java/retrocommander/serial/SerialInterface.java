@@ -20,10 +20,8 @@ public class SerialInterface {
     public final int resendTimeout=10000;
     public final int resendAttempts=3;
     private final SerialPort port;
-    private byte sendBitCount;
-    private byte receiveBitCount;
-    private boolean startSendBitCount;
-    private boolean startReceiveBitCount;
+    private boolean lineBitCount;
+    private boolean validBitCount;
 
     public SerialInterface(String serialPortName, int stopBits, int baudrate, int parity, int flowControl) throws SerialPortInvalidPortException {
         port=SerialPort.getCommPort(serialPortName);
@@ -37,9 +35,8 @@ public class SerialInterface {
         port.setFlowControl(flowControl);
         port.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING,0,0);
         if (!port.openPort()) throw new SerialPortIOException("Error opening serial device");
-        startSendBitCount=false;
-        startReceiveBitCount=false;
-        sendBitCount=0;
+        lineBitCount=false;
+        validBitCount=false;
         port.setDTR();
     }
     public void close() {
@@ -99,29 +96,41 @@ public class SerialInterface {
                 System.out.println("The received data is a valid packet !");
                 if (!acknowledge) {
                     try {
+                        if (!validBitCount) {
+                            lineBitCount = bitCount != 0x00;
+                            validBitCount=true;
+                        } else {
+                            if ((lineBitCount && bitCount == 0x00) || (!lineBitCount && bitCount != 0x00)) {
+                                lineBitCount=!lineBitCount;
+                                sendPacket(new Packet(true));
+                                System.out.println("This packet is already received");
+                                lineBitCount=!lineBitCount;
+                                continue;
+                            }
+                        }
                         sendPacket(new Packet(true));
-
+                        lineBitCount = !lineBitCount;
+                        port.clearRTS();
+                        System.out.println("---> Packet Received from master: " + receivedPacket);
+                        return receivedPacket;
                     } catch (SerialPortIOException e) {
                         System.out.println("Error during ACK sending: "+e.getMessage());
                     }
-                }
-                if (!startReceiveBitCount) {
-                    receiveBitCount=bitCount;
-                    startReceiveBitCount=true;
-                    port.clearRTS();
-                    System.out.println("---> Packet Received from master: "+receivedPacket);
-                    return receivedPacket;
                 } else {
-                    if (receiveBitCount!=bitCount) {
-                        receiveBitCount=bitCount;
-                        port.clearRTS();
-                        System.out.println("---> Packet Received from master: "+receivedPacket);
-                        return receivedPacket;
+
+                    if (!validBitCount) {
+                        lineBitCount = bitCount != 0x00;
+                        validBitCount=true;
+                    } else {
+                        if ((lineBitCount && bitCount == 0x00) || (!lineBitCount && bitCount != 0x00)) {
+                            System.out.println("This ACK is for the previous packet");
+                            continue;
+                        }
                     }
+                    port.clearRTS();
+                    System.out.println("ACK received from master");
+                    return receivedPacket;
                 }
-                System.out.println("This packet is already received");
-
-
 
             }
         } catch (SerialPortIOException e) {
@@ -129,10 +138,11 @@ public class SerialInterface {
             throw e;
         }
     }
+
     public void sendPacket(Packet p) throws SerialPortIOException {
-        if (!startSendBitCount) {
-            startSendBitCount = true;
-            sendBitCount=0x00;
+        if (!validBitCount) {
+            validBitCount = true;
+            lineBitCount=false;
         }
         byte[] buffer=new byte[5];
         buffer[0]=Packet.startByte;
@@ -142,9 +152,12 @@ public class SerialInterface {
             buffer[1]= (byte) (buffer[1] | (byte) (outputData.length & Packet.dimensionMask));
         }
         if (p.isAcknowledge()) buffer[1]=(byte) (buffer[1] | Packet.acknowledgeBitMask);
-        buffer[1]=(byte)(buffer[1]|sendBitCount);
+
+        if (lineBitCount) {
+            buffer[1]=(byte)(buffer[1]|Packet.packetCountMask);
+        }
         buffer[2]=p.getCommand();
-        buffer[3]=p.getChecksum(sendBitCount!=0);
+        buffer[3]=p.getChecksum(lineBitCount);
         boolean directive=false;
         if (!p.isAcknowledge()) {
             for (int i = 0; i < resendAttempts; i++) {
@@ -161,6 +174,7 @@ public class SerialInterface {
                     Packet temp=getPacket(true);
                     if (temp.isAcknowledge()) {
                         directive = true;
+                        lineBitCount=!lineBitCount;
                         break;
                     }
                 } catch (SerialPortIOException e) {
@@ -178,14 +192,6 @@ public class SerialInterface {
             port.writeBytes(buffer, 5);
             System.out.println("ACK sent to master");
         }
-        sendBitCount = (byte) ((byte) (sendBitCount ^ 0xff) & Packet.packetCountMask);
-
-
-    }
-    public void resetConnection() {
-        startSendBitCount=false;
-        startReceiveBitCount=false;
-        sendBitCount=0;
     }
 
 }

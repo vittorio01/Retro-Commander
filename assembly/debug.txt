@@ -1,4 +1,4 @@
-debug_mode $0001
+debug_mode $0000
 start_address $8000
 serial_packet_state $0200
 serial_data_port $0026
@@ -77,8 +77,8 @@ serial_wait_new_byte $822e
 serial_send_new_byte $8239
 serial_send_new_byte_wait $823a
 serial_get_input_state $8246
-serial_get_output_state $8249
-serial_send_byte $824c
-serial_get_byte $824f
-serial_configure $8252
-device_boardid $8253
+serial_get_output_state $824e
+serial_send_byte $8256
+serial_get_byte $8259
+serial_configure $825c
+device_boardid $8272

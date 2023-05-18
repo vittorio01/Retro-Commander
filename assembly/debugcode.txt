@@ -18,7 +18,7 @@ $8023 06 22      mvi b,$22
 $8025 21 c0 ff   lxi h,$ffc0
 $8028 0e 00      mvi c,$00
 $802a 39         dad sp
-$802b 11 53 82   lxi d,$8253
+$802b 11 72 82   lxi d,$8272
 $802e 1a         ldax d
 $802f b7         ora a
 $8030 ca 3a 80   jz $803a
@@ -71,7 +71,7 @@ $807f 7e         mov a,m
 $8080 c1         pop b
 $8081 e1         pop h
 $8082 c9         ret
-$8083 cd 52 82   call $8252
+$8083 cd 5c 82   call $825c
 $8086 af         xra a
 $8087 32 00 02   sta $0200
 $808a c9         ret
@@ -308,7 +308,7 @@ $8221 af         xra a
 $8222 37         stc
 $8223 3f         cmc
 $8224 c3 2b 82   jmp $822b
-$8227 cd 4f 82   call $824f
+$8227 cd 59 82   call $8259
 $822a 37         stc
 $822b d1         pop d
 $822c c1         pop b
@@ -316,24 +316,41 @@ $822d c9         ret
 $822e cd 46 82   call $8246
 $8231 b7         ora a
 $8232 ca 2e 82   jz $822e
-$8235 cd 4f 82   call $824f
+$8235 cd 59 82   call $8259
 $8238 c9         ret
 $8239 f5         push psw
-$823a cd 49 82   call $8249
+$823a cd 4e 82   call $824e
 $823d b7         ora a
 $823e ca 3a 82   jz $823a
 $8241 f1         pop psw
-$8242 cd 4c 82   call $824c
+$8242 cd 56 82   call $8256
 $8245 c9         ret
-$8246 3e ff      mvi a,$ff
-$8248 c9         ret
-$8249 3e ff      mvi a,$ff
-$824b c9         ret
-$824c d3 26      out $26
-$824e c9         ret
-$824f db 26      in $26
-$8251 c9         ret
-$8252 c9         ret
+$8246 db 27      in $27
+$8248 e6 02      ani $02
+$824a c8         rz
+$824b 3e ff      mvi a,$ff
+$824d c9         ret
+$824e db 27      in $27
+$8250 e6 01      ani $01
+$8252 c8         rz
+$8253 3e ff      mvi a,$ff
+$8255 c9         ret
+$8256 d3 26      out $26
+$8258 c9         ret
+$8259 db 26      in $26
+$825b c9         ret
+$825c af         xra a
+$825d d3 27      out $27
+$825f d3 27      out $27
+$8261 d3 27      out $27
+$8263 3e 40      mvi a,$40
+$8265 d3 27      out $27
+$8267 3e 4d      mvi a,$4d
+$8269 d3 27      out $27
+$826b 3e 37      mvi a,$37
+$826d d3 27      out $27
+$826f db 26      in $26
+$8271 c9         ret
 
-$8253 46 45 4e 49 58 20 31 20   FENIX 1 
-$825b 46 55 4c 4c 00            FULL.
+$8272 46 45 4e 49 58 20 31 20   FENIX 1 
+$827a 46 55 4c 4c 00            FULL.

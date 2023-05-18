@@ -8,7 +8,7 @@
 ;               from bit 5 to bit 0 -> data dimension (max 64 bytes)
 ; checksum ->   used for checking errors. It's a simple 8bit truncated sum of all bytes of the packet (also header,command,start and stop bytes) 
 
-debug_mode      .var  true 
+debug_mode      .var  false
 
 start_address                           .equ    $8000 
 serial_packet_state                     .equ    $0200

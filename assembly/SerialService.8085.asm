@@ -17,6 +17,12 @@ serial_data_port        .equ %00100110
 serial_command_port     .equ %00100111
 serial_port_settings    .equ %01001101
 
+serial_error_reset_bit          .equ %00010000
+serial_rts_bit                  .equ %00100000
+serial_receive_enable_bit       .equ %00000100
+serial_transmit_enable_bit      .equ %00000001
+serial_dtr_enable_bit           .equ %00000010
+
 serial_state_input_line_mask    .equ %00000010
 serial_state_output_line_mask   .equ %00000001
 
@@ -159,6 +165,7 @@ serial_line_initialize: call serial_configure
 serial_get_packet:              push d 
                                 push psw 
                                 push h 
+                                call serial_set_rts_on
 serial_get_packet_retry:        pop h 
                                 pop psw 
                                 push psw 
@@ -266,6 +273,7 @@ serial_get_packet_end:          pop h
                                 inx sp 
                                 inx sp 
                                 pop d 
+                                call serial_set_rts_off
                                 ret 
 
 
@@ -431,6 +439,33 @@ serial_send_new_byte_wait:  call serial_get_output_state
                             call serial_send_byte
                             ret 
 
+;serial_set_rts_on enable the RTS line
+.if (debug_mode==false)
+serial_set_rts_on:      push psw 
+                        mvi a,serial_rts_bit+serial_error_reset_bit+serial_transmit_enable_bit+serial_receive_enable_bit+serial_dtr_enable_bit
+                        out serial_command_port	
+                        pop psw 
+                        ret 
+.endif 
+
+.if (debug_mode==true) 
+serial_set_rts_on:      ret 
+.endif 
+
+;serial_set_rts_off disables the RTS line
+.if (debug_mode==false)
+serial_set_rts_off:     push psw
+                        mvi a,serial_error_reset_bit+serial_transmit_enable_bit+serial_receive_enable_bit+serial_dtr_enable_bit
+                        out serial_command_port	
+                        pop psw 
+                        ret 
+.endif 
+
+.if (debug_mode==true)
+serial_set_rts_off:     ret
+.endif 
+
+
 ;serial_get_input_state returns the state of the serial device input line
 ;A <- $ff if there is an incoming byte, $00 otherwise 
 .if (debug_mode==false)
@@ -477,7 +512,7 @@ serial_configure:   xra a
                     out serial_command_port	
                     mvi a,serial_port_settings
                     out serial_command_port	
-                    mvi a,%00110111
+                    mvi a,serial_error_reset_bit+serial_transmit_enable_bit+serial_receive_enable_bit+serial_dtr_enable_bit
                     out serial_command_port	
                     in serial_data_port	
                     ret 

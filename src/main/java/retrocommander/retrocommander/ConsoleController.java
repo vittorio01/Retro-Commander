@@ -162,6 +162,7 @@ public class ConsoleController {
             diskCheck.setDisable(false);
             masterConnectionOpened=false;
             startButton.setText("Start Communication");
+            connectionLabel.setVisible(false);
 
         }
 

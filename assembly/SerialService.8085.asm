@@ -11,7 +11,7 @@
 debug_mode      .var  false
 
 start_address                           .equ    $8000 
-serial_packet_state                     .equ    $0200
+serial_packet_state                     .equ    $7fff
 
 serial_data_port        .equ %00100110
 serial_command_port     .equ %00100111
@@ -60,7 +60,7 @@ serial_packet_connection_reset    .equ %01000000
 begin:  .org start_address
         jmp  start
 
-start:                  lxi sp,$7fff
+start:                  lxi sp,$7ffe
                         call serial_line_initialize
                         call serial_reset_connection
                         

@@ -1,6 +1,6 @@
 debug_mode $0000
 start_address $8000
-serial_packet_state $0200
+serial_packet_state $7fff
 serial_data_port $0026
 serial_command_port $0027
 serial_port_settings $004d

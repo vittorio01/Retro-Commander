@@ -1,5 +1,5 @@
 $8000 c3 03 80   jmp $8003
-$8003 31 ff 7f   lxi sp,$7fff
+$8003 31 fe 7f   lxi sp,$7ffe
 $8006 cd 83 80   call $8083
 $8009 cd 0d 80   call $800d
 $800c 76         hlt
@@ -11,9 +11,9 @@ $8012 0e 00      mvi c,$00
 $8014 af         xra a
 $8015 cd 5d 81   call $815d
 $8018 d2 10 80   jnc $8010
-$801b 3a 00 02   lda $0200
+$801b 3a ff 7f   lda $7fff
 $801e f6 40      ori $40
-$8020 32 00 02   sta $0200
+$8020 32 ff 7f   sta $7fff
 $8023 06 22      mvi b,$22
 $8025 21 c0 ff   lxi h,$ffc0
 $8028 0e 00      mvi c,$00
@@ -73,7 +73,7 @@ $8081 e1         pop h
 $8082 c9         ret
 $8083 cd 70 82   call $8270
 $8086 af         xra a
-$8087 32 00 02   sta $0200
+$8087 32 ff 7f   sta $7fff
 $808a c9         ret
 $808b d5         push d
 $808c f5         push psw
@@ -151,7 +151,7 @@ $810e 0e 00      mvi c,$00
 $8110 3e ff      mvi a,$ff
 $8112 cd 5d 81   call $815d
 $8115 c1         pop b
-$8116 3a 00 02   lda $0200
+$8116 3a ff 7f   lda $7fff
 $8119 e6 80      ani $80
 $811b ca 2d 81   jz $812d
 $811e 7b         mov a,e
@@ -167,13 +167,13 @@ $8130 c2 91 80   jnz $8091
 $8133 7b         mov a,e
 $8134 e6 80      ani $80
 $8136 c2 48 81   jnz $8148
-$8139 3a 00 02   lda $0200
+$8139 3a ff 7f   lda $7fff
 $813c ee ff      xri $ff
 $813e e6 80      ani $80
 $8140 57         mov d,a
-$8141 3a 00 02   lda $0200
+$8141 3a ff 7f   lda $7fff
 $8144 b2         ora d
-$8145 32 00 02   sta $0200
+$8145 32 ff 7f   sta $7fff
 $8148 7b         mov a,e
 $8149 e6 3f      ani $3f
 $814b 4f         mov c,a
@@ -201,7 +201,7 @@ $816a c3 71 81   jmp $8171
 $816d 79         mov a,c
 $816e e6 3f      ani $3f
 $8170 4f         mov c,a
-$8171 3a 00 02   lda $0200
+$8171 3a ff 7f   lda $7fff
 $8174 e6 80      ani $80
 $8176 ca 7d 81   jz $817d
 $8179 79         mov a,c
@@ -277,17 +277,17 @@ $81e6 c2 9e 81   jnz $819e
 $81e9 37         stc
 $81ea 3f         cmc
 $81eb c3 0b 82   jmp $820b
-$81ee 3a 00 02   lda $0200
+$81ee 3a ff 7f   lda $7fff
 $81f1 e6 80      ani $80
 $81f3 ca 02 82   jz $8202
-$81f6 3a 00 02   lda $0200
+$81f6 3a ff 7f   lda $7fff
 $81f9 e6 7f      ani $7f
-$81fb 32 00 02   sta $0200
+$81fb 32 ff 7f   sta $7fff
 $81fe 37         stc
 $81ff c3 0b 82   jmp $820b
-$8202 3a 00 02   lda $0200
+$8202 3a ff 7f   lda $7fff
 $8205 f6 80      ori $80
-$8207 32 00 02   sta $0200
+$8207 32 ff 7f   sta $7fff
 $820a 37         stc
 $820b e1         pop h
 $820c c1         pop b

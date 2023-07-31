@@ -8,7 +8,7 @@ begin:      .org start_address
 start:          lxi h,ram_start 
                 lxi b,ram_end-ram_start 
                 mvi d,$01
-loop:           mov m,a 
+loop:           mov m,d
                 inx h 
                 inr d 
                 dcx b 

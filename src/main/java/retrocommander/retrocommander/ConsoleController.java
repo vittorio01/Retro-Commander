@@ -186,7 +186,7 @@ public class ConsoleController {
     }
     @FXML
     private void sendCharacter(KeyEvent event) {
-        if (serialOn && masterConnectionOpened) {
+        if (serialOn) {
             terminalSendQueue.add(event.getCode().getChar().charAt(0));
         }
     }
@@ -348,15 +348,12 @@ public class ConsoleController {
                             }
                         }
                     });
-
                     break;
                 case terminal_readRequest:
-                    if (terminalSendQueue.isEmpty()) {
+                    if (!terminalSendQueue.isEmpty()) {
                         byte[] data=new byte[1];
                         data[0]=(byte)(terminalSendQueue.remove().charValue());
                         serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
-                    } else {
-                        serialChannel.sendPacket(new Packet(false, terminal_readRequest, null));
                     }
                     break;
 

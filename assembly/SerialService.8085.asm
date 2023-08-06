@@ -140,9 +140,6 @@ serial_request_terminal_char_get_retry: stc
                                         mov a,b 
                                         cpi serial_command_request_terminal_char_byte
                                         jnz serial_request_terminal_char_get_retry
-                                        mov a,c 
-                                        ora a 
-                                        jz serial_request_terminal_char_retry
                                         mov a,m 
                                         pop b 
                                         pop h 

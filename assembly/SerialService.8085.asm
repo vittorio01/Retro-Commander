@@ -63,8 +63,10 @@ begin:  .org start_address
 start:                  lxi sp,$7ffe
                         call serial_line_initialize
                         call serial_reset_connection
-                        
-                        hlt 
+loop:					call serial_request_terminal_char
+						call serial_send_terminal_char
+						jmp loop
+                       
 
 
 ;serial_reset_connection sends an open request to the slave and send the board ID
@@ -166,7 +168,8 @@ serial_get_packet:              push d
                                 push psw 
                                 push h 
                                 call serial_set_rts_on
-serial_get_packet_retry:        pop h 
+serial_get_packet_retry:        
+								pop h 
                                 pop psw 
                                 push psw 
                                 push h 
@@ -190,6 +193,7 @@ serial_get_packet_begin:        cpi serial_packet_start_packet_byte
                                 call serial_wait_timeout_new_byte 
                                 jnc serial_get_packet_retry
                                 mov d,a                                 ;D <- checksum
+
                                 mov a,e 
                                 ani serial_packet_dimension_mask   
                                 jz serial_get_packet_stop_byte           
@@ -264,7 +268,7 @@ serial_get_packet_count_switch: lda serial_packet_state
 serial_get_packet_acknowledge:  mov a,e 
                                 ani serial_packet_dimension_mask
                                 mov c,a 
-                                mov a,e
+								mov a,e
                                 ani serial_packet_acknowledge_bit_mask
                                 stc 
                                 jz serial_get_packet_end
@@ -375,7 +379,8 @@ serial_send_packet_send_retry:  dcr b
                                 stc 
                                 cmc 
                                 jmp serial_send_packet_end
-serial_send_packet_ok:          lda serial_packet_state 
+serial_send_packet_ok:          
+								lda serial_packet_state 
                                 ani serial_packet_line_state 
                                 jz serial_send_packet_ok2
                                 lda serial_packet_state 

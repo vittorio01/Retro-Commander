@@ -17,7 +17,7 @@ public class SerialInterface {
     private final int baudrate;
     private final int parity;
     private final int flowControl;
-    public final int resendTimeout=10000;
+    public final int resendTimeout=0;
     public final int resendAttempts=3;
     private final SerialPort port;
     private boolean lineBitCount;
@@ -161,7 +161,7 @@ public class SerialInterface {
         boolean directive=false;
         if (!p.isAcknowledge()) {
             for (int i = 0; i < resendAttempts; i++) {
-                port.writeBytes(buffer, 5);
+                port.writeBytes(buffer, 4);
 
                 if (outputData != null && outputData.length!=0) {
                     port.writeBytes(outputData, outputData.length);

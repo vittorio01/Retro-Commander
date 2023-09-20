@@ -358,7 +358,7 @@ public class ConsoleController {
                     break;
 
             }
-                    /*
+
                 case disk:
                     if (receivedCommand[0] == disk_getInformation) {
                         byte[] response = new byte[6];
@@ -421,7 +421,7 @@ public class ConsoleController {
 
                     break;
 
-                     */
+
 
 
         }

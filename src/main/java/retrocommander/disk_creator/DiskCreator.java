@@ -30,7 +30,7 @@ public class DiskCreator {
     private Label tphLabel;
     @FXML
     private Label headLabel;
-    public static final String[] sectorDimensions={"128 bytes","256 bytes","512 bytes","1k bytes","2 Kbytes","4 Kbytes"};
+    public static final String[] sectorDimensions={"128 bytes","256 bytes","512 bytes","1k bytes","2K bytes","4K bytes"};
     public static final int sptMax=256;
     public static final int tphMax=65536;
     public static final int headMax=256;
@@ -52,7 +52,7 @@ public class DiskCreator {
             short sectorDimension=0;
             for (int i=0;i<sectorDimensions.length;i++) {
                 if (sectorDimensions[i].equals(sectorChoice.getValue())) {
-                    sectorDimension= (short) ((2^i)*128);
+                    sectorDimension= (short) ((Math.pow(2,i))*128);
                     break;
                 }
             }

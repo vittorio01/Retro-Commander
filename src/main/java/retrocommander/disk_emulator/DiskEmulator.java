@@ -38,6 +38,7 @@ public class DiskEmulator {
         tph_number= filestream.readShort();
         spt_number=filestream.readShort();
         sector_dimension=filestream.readShort();
+        binded=true;
         filestream.close();
     }
     public static void createDiskFile(String filepath, short sector_dimension, short spt_number, short tph_number, short head_number) throws IOException {

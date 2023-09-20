@@ -271,10 +271,10 @@ public class ConsoleController {
     /*
     *** control ***
     These command are used for sending information about the connection:
-    -   reset connection -> the master tells the slave that there is an hardware reset
+    -   reset connection -> the master tells the slave that there is a hardware reset
         body -> (void)
     -   board id -> the master sends a packet containing the board id
-        body -> board id char array)
+        body -> (board id char array)
     */
     public static final byte control_resetConnection = 0x21;
     public static final byte control_boardId = 0x22;
@@ -287,7 +287,9 @@ public class ConsoleController {
         DiskEmulator disk=null;
         if (bindDisk) {
             disk=new DiskEmulator(diskFile);
+            disk.bindDiskFile(diskEmulationFile.getPath());
         }
+        diskEmulationOn=bindDisk;
         serialChannel = new SerialInterface(serialPortName, ConsoleController.stopBits,baudrate, ConsoleController.parity, ConsoleController.flowControl);
         serialChannel.open();
         Platform.runLater(() -> logTextArea.appendText("Serial device opened Correctly!\n"));
@@ -356,74 +358,89 @@ public class ConsoleController {
                         serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
                     }
                     break;
-
-            }
-
-                case disk:
-                    if (receivedCommand[0] == disk_getInformation) {
+                case disk_getInformation:
+                    //returns disk status
+                    // data[0] = inserted(7) + ready(6) + read only (5) + transfer error (4) + seek error (3) + ...
+                    if (diskEmulationOn) {
                         byte[] response = new byte[6];
-                        if (bindDisk) {
-                            response[0] = disk_insertedMask | disk_readyMask;
-                            if (disk.isReadOnly()) {
-                                response[0] = (byte) (response[0] | disk_readOnlyMask);
-                            }
-                            if (sectorTransferError) {
-                                response[0] = (byte) (response[0] | disk_dataTransferErrorMask);
-                            }
-                            if (sectorSeekError) {
-                                response[0] = (byte) (response[0] | disk_seekErrorMask);
-                            }
-                            response[1] = (byte) (disk.getSectorDimension() / 128);
-                            response[2] = (byte) disk.getSpt();
-                            response[3] = (byte) (disk.getTph() & 0x00ff);
-                            response[4] = (byte) (disk.getTph() & 0xff00);
-                            response[5] = (byte) disk.getHeadNumber();
-
-                        } else {
-                            response[0] = (byte) 0;
-                            response[1] = (byte) 0;
-                            response[2] = (byte) 0;
-                            response[3] = (byte) 0;
-                            response[4] = (byte) 0;
-                            response[5] = (byte) 0;
+                        response[0] = disk_insertedMask | disk_readyMask;
+                        if (disk.isReadOnly()) {
+                            response[0] = (byte) (response[0] | disk_readOnlyMask);
                         }
-                        serialChannel.sendPacket(new Packet(false, channel.disk, response));
-
-                    } else if (receivedCommand[0] == disk_readSector && diskEmulationOn) {
-                        short sector_number = receivedCommand[1];
-                        short track_number = receivedCommand[2];
-                        short head_number = receivedCommand[4];
-                        byte[] sector = disk.readDiskSector(head_number, track_number, sector_number);
-                        for (int byteCounter = 0; byteCounter < disk.getSectorDimension(); byteCounter = byteCounter + Packet.dimensionMask) {
-                            byte[] buffer = new byte[Packet.dimensionMask];
-                            System.arraycopy(sector, byteCounter, buffer, 0, buffer.length);
-                            serialChannel.sendPacket(new Packet(false, channel.disk, buffer));
+                        if (sectorTransferError) {
+                            response[0] = (byte) (response[0] | disk_dataTransferErrorMask);
                         }
-                        logTextArea.appendText("Disk read operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
-                    } else if (receivedCommand[0] == disk_writeSector && diskEmulationOn) {
-                        short sector_number = receivedCommand[1];
-                        short track_number = receivedCommand[2];
-                        short head_number = receivedCommand[4];
+                        if (sectorSeekError) {
+                            response[0] = (byte) (response[0] | disk_seekErrorMask);
+                        }
+                        // if disk emulation is on, next bytes contains disk structure
+                        // sector dimension (128 multiple, 1 byte) + sector per track (1 byte) + tracks per head (2 bytes) + heads (1 byte)
+                        response[1] = (byte) (disk.getSectorDimension() / 128);
+                        response[2] = (byte) disk.getSpt();
+                        response[3] = (byte) (disk.getTph() & 0x00ff);
+                        response[4] = (byte) (disk.getTph() & 0xff00);
+                        response[5] = (byte) disk.getHeadNumber();
+                        serialChannel.sendPacket(new Packet(false, disk_getInformation,response));
+                    } else {
+                        // if disk emulation is off, response packet contains a single 0x00 byte as body
+                        byte[] response = new byte[1];
+                        response[0] = (byte) 0;
+                        serialChannel.sendPacket(new Packet(false, disk_getInformation,response));
+                    }
+                    break;
+
+                case disk_readSector:
+                    if (diskEmulationOn) {
+                        // if disk emulation is on, slave receive the first packet from master and next sends back all data divided in different packets.
+                        short sector_number = received_data[0];
+                        short track_number = received_data[1];
+                        short head_number = received_data[3];
+                        try {
+                            byte[] sector = disk.readDiskSector(head_number, track_number, sector_number);
+                            for (int byteCounter = Packet.dimensionMask; byteCounter < disk.getSectorDimension(); byteCounter = byteCounter + Packet.dimensionMask) {
+                                byte[] buffer = new byte[Packet.dimensionMask];
+                                System.arraycopy(sector, byteCounter-(Packet.dimensionMask), buffer, 0, buffer.length);
+                                serialChannel.sendPacket(new Packet(false, disk_readSector, buffer));
+                            }
+                            logTextArea.appendText("Disk read operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
+                        } catch (NullPointerException e) {
+                            serialChannel.sendPacket(new Packet(false, disk_readSector, null));
+                            System.out.println("disk read error: "+e.getMessage());
+                        }
+
+                    } else {
+                        // if disk emulation is off or there is a read error, slave respond with a void packet.
+                        serialChannel.sendPacket(new Packet(false, disk_readSector, null));
+                    }
+                    break;
+                case disk_writeSector:
+                    if (diskEmulationOn) {
+                        // the slave receive a first packet with all information
+                        short sector_number = received_data[0];
+                        short track_number = received_data[1];
+                        short head_number = received_data[3];
 
                         byte[] sector = new byte[disk.getSectorDimension()];
                         int index = 0;
                         Packet temp;
+                        // when the slave is ready, it receives all packet with disk data divided in different packets from the master
                         while (index < disk.getSectorDimension()) {
-                            temp = serialChannel.getPacket();
-                            for (int i = 0; i < Packet.dimensionMask; i++) {
-                                sector[index + i] = temp.getData()[i];
-                                index++;
+                            temp = serialChannel.getPacket(false);
+                            if (temp.getData()!=null && temp.getCommand()==disk_writeSector) {
+                                for (int i = 0; i < Packet.dimensionMask; i++) {
+                                    sector[index + i] = temp.getData()[i];
+                                    index++;
+                                }
+                            } else {
+                                break;
                             }
                         }
+
                         disk.writeDiskSector(sector, head_number, track_number, sector_number);
                         logTextArea.appendText("Disk write operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
                     }
-
                     break;
-
-
-
-
+            }
         }
         serialChannel.close();
         Platform.runLater(() -> connectionLabel.setVisible(false));

@@ -1,0 +1,9 @@
+@font-face {
+    src: url('JetBrainsMono-ExtraBold.ttf');
+}
+
+#terminalTextArea {
+    -fx-control-inner-background: black;
+    -fx-font-family: 'JetBrains Mono Extra Bold';
+    -fx-font-size: 13;
+}

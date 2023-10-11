@@ -18,7 +18,7 @@
         <dependency>
             <groupId>com.fazecast</groupId>
             <artifactId>jSerialComm</artifactId>
-            <version>[2.0.0,3.0.0)</version>
+            <version>[2.0.0,3.0.0) </version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
@@ -39,14 +39,15 @@
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
             <version>11</version>
-            <classifier>linux</classifier>
+            <classifier>win</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
             <version>11</version>
-            <classifier>win</classifier>
+            <classifier>linux</classifier>
         </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>

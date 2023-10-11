@@ -1,21 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ChoiceBox?>
-<?import javafx.scene.control.ComboBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Tab?>
-<?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.ToolBar?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 
-<AnchorPane xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="retrocommander.retrocommander.ConsoleController">
+<AnchorPane xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1" fx:controller="retrocommander.retrocommander.ConsoleController">
    <children>
       <TabPane fx:id="tabPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="300.0" prefWidth="450.0" tabClosingPolicy="UNAVAILABLE">
         <tabs>
@@ -25,10 +16,13 @@
                      <children>
                         <VBox>
                            <children>
-                              <TextArea fx:id="terminalTextArea" editable="false" onKeyPressed="#sendCharacter" prefHeight="230.0" prefWidth="450.0" style="-fx-control-inner-background: black;" wrapText="true">
+                              <TextArea fx:id="terminalTextArea" editable="false" onKeyTyped="#sendCharacter" prefHeight="230.0" prefWidth="450.0" styleClass="terminalTextArea" stylesheets="@../../fonts/terminal.css" wrapText="true">
                                  <font>
-                                    <Font name="Monospaced Bold" size="14.0" />
+                                    <Font name="JetBrains Mono ExtraBold" size="14.0" />
                                  </font>
+                                 <cursor>
+                                    <Cursor fx:constant="NONE" />
+                                 </cursor>
                               </TextArea>
                               <ToolBar prefHeight="40.0" prefWidth="200.0">
                                 <items>

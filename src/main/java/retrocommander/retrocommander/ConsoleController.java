@@ -2,7 +2,6 @@ package retrocommander.retrocommander;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
@@ -12,16 +11,16 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.paint.Paint;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javafx.stage.WindowEvent;
 import retrocommander.disk_creator.DiskCreator;
 import retrocommander.disk_emulator.DiskEmulator;
 import retrocommander.serial.Packet;
+import retrocommander.serial.PacketType;
 import retrocommander.serial.SerialInterface;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ConsoleController {
     public static final int[] baudrates={300,600,2400,4800,9600,19200,38400,57600,115200};
@@ -34,8 +33,6 @@ public class ConsoleController {
     public static final int line_tab_number=8;
 
 
-    @FXML
-    private Button clearButton;
     @FXML
     private Button startButton;
     @FXML
@@ -56,27 +53,27 @@ public class ConsoleController {
     @FXML
     private TextArea logTextArea;
     @FXML
-    private TabPane tabPane;
-    @FXML
     private Label connectionLabel;
     private static boolean diskCreatorOn;
     private boolean serialOn;
-    private boolean masterConnectionOpened;
     private boolean diskEmulationOn;
     private boolean diskEmulationSelecting;
     File diskEmulationFile;
     SerialInterface serialChannel;
     int carriage;
-    private BlockingQueue<Character> terminalSendQueue;
     private Thread serialConnection;
+    private final Object lock=new Object();
+    private ArrayBlockingQueue<Character> charInList;
+    private AtomicBoolean allowKey;
     @FXML
     public void initialize() {
+        allowKey=new AtomicBoolean(false);
+        charInList=new ArrayBlockingQueue<Character>(line_dimension);
         diskCreatorOn=false;
         carriage=0;
         serialOn=false;
         diskEmulationOn=false;
         diskEmulationSelecting=false;
-        masterConnectionOpened=false;
         for (int baudrate : baudrates) {
             baudrateChoice.getItems().add(baudrate);
         }
@@ -87,13 +84,11 @@ public class ConsoleController {
             targetPortCombo.setValue(targetPortCombo.getItems().get(0));
         }
         baudrateChoice.setValue(baudrates[0]);
-        terminalSendQueue=new ArrayBlockingQueue<Character>(120);
-
     }
     @FXML
     private boolean checkOptions() {
         boolean result=true;
-        if (targetPortCombo.getValue().equals("")) {
+        if (targetPortCombo.getValue().isEmpty()) {
             targetPortLabel.setTextFill(Paint.valueOf("RED"));
             result=false;
         } else {
@@ -123,47 +118,49 @@ public class ConsoleController {
             startButton.setText("Stop Communication");
             diskCheck.setDisable(true);
             logTextArea.appendText("Starting serial connection... \n");
-            serialConnection=new Thread(new Task<Void>() {
-                @Override
-                protected Void call() throws Exception {
-                    try {
+            try {
+                serialConnection=new Thread(new Task<Void>() {
+                    @Override
+                    protected Void call() throws Exception {
                         if (diskEmulationOn) {
                             connect(targetPortCombo.getValue(), baudrateChoice.getValue(), diskEmulationOn, diskEmulationFile.getPath());
                         } else {
                             connect(targetPortCombo.getValue(), baudrateChoice.getValue(), diskEmulationOn, null);
                         }
-                    } catch (Exception e) {
-                        if (serialChannel!=null) {
-                            serialChannel.close();
-                        }
-                        if (!e.getMessage().equals("Timeout error")) {
-                            Platform.runLater(() -> {
-                                logTextArea.appendText("Fatal error: "+e.getMessage() + "\nConnection Closed\n");
-                                connectionLabel.setVisible(true);
-                                connectionLabel.setTextFill(Paint.valueOf("RED"));
-                                connectionLabel.setText("Connection closed");
-                                startButton.setText("Start Communication");
-                                diskCheck.setDisable(false);
-                            });
-                        }
+                        return null;
 
-                        serialOn = false;
                     }
-                    return null;
+                });
+                serialConnection.setDaemon(true);
+                serialConnection.start();
+            } catch (Exception e) {
+                if (serialChannel != null) {
+                    serialChannel.close();
+
                 }
-            });
-            serialConnection.setDaemon(true);
-            serialConnection.start();
+                serialConnection.interrupt();
+                Platform.runLater(() -> {
+                    logTextArea.appendText(e.getMessage() + "\nConnection Closed\n");
+                    connectionLabel.setVisible(true);
+                    connectionLabel.setTextFill(Paint.valueOf("RED"));
+                    connectionLabel.setText("Connection closed");
+                    startButton.setText("Start Communication");
+                    diskCheck.setDisable(false);
+                });
+                serialOn = false;
+            }
+
 
         } else {
             serialChannel.close();
+            try {
+                serialConnection.interrupt();
+            } catch (Exception ignored) {}
             serialOn=false;
             logTextArea.appendText("Closing Serial connection... \n");
             diskCheck.setDisable(false);
-            masterConnectionOpened=false;
             startButton.setText("Start Communication");
             connectionLabel.setVisible(false);
-
         }
 
     }
@@ -185,9 +182,14 @@ public class ConsoleController {
 
     }
     @FXML
-    private void sendCharacter(KeyEvent event) {
-        if (serialOn) {
-            terminalSendQueue.add(event.getCode().getChar().charAt(0));
+    private void sendCharacter(KeyEvent event) throws SerialPortIOException {
+        synchronized (lock) {
+            if (serialOn && event.getEventType()==KeyEvent.KEY_TYPED) {
+                charInList.add(event.getCharacter().charAt(0));
+                if (charInList.size()==1) {
+                    lock.notify();
+                }
+            }
         }
     }
     @FXML
@@ -220,6 +222,7 @@ public class ConsoleController {
             diskCheck.setSelected(false);
         }
         diskEmulationSelecting=false;
+
     }
 
 
@@ -296,151 +299,158 @@ public class ConsoleController {
         Packet p;
         sectorSeekError=false;
         sectorTransferError=false;
+        allowKey.set(false);
         while (serialOn) {
-            p = serialChannel.getPacket(false);
+                p = serialChannel.getPacket(false);
+                byte[] received_data = p.getData();
+                switch (p.getCommand()) {
+                    case control_resetConnection:
+                        Platform.runLater(() -> {
+                            logTextArea.appendText("The external device has started a new connection!\n");
+                            connectionLabel.setVisible(true);
+                            connectionLabel.setTextFill(Paint.valueOf("BLACK"));
+                            connectionLabel.setText("Connected: unknown");
+                            charInList.clear();
+                        });
+                        break;
 
-            byte[] received_data=p.getData();
-            switch (p.getCommand()) {
-                case control_resetConnection:
-                    Platform.runLater(() -> {
-                        logTextArea.appendText("The external device has started a new connection!\n");
-                        connectionLabel.setVisible(true);
-                        connectionLabel.setTextFill(Paint.valueOf("BLACK"));
-                        connectionLabel.setText("Connected: unknown");
-                    });
-                    break;
-
-                case control_boardId:
-                    StringBuilder boardid = new StringBuilder();
-                    if (received_data!=null) {
-                        for (byte b : received_data) {
-                            boardid.append((char) b);
+                    case control_boardId:
+                        StringBuilder boardid = new StringBuilder();
+                        if (received_data != null) {
+                            for (byte b : received_data) {
+                                boardid.append((char) b);
+                            }
                         }
-                    }
-                    Platform.runLater(() -> {
-                        logTextArea.setText("The external device has sent his ID:" + boardid + "\n");
-                        connectionLabel.setVisible(true);
-                        connectionLabel.setTextFill(Paint.valueOf("BLACK"));
-                        connectionLabel.setText("Connected: "+boardid);
-                    });
-                    break;
+                        Platform.runLater(() -> {
+                            logTextArea.setText("The external device has sent his ID:" + boardid + "\n");
+                            connectionLabel.setVisible(true);
+                            connectionLabel.setTextFill(Paint.valueOf("BLACK"));
+                            connectionLabel.setText("Connected: " + boardid);
+                        });
+                        break;
 
-                case terminal_sendString:
-                    Platform.runLater(() -> {
-                        for (byte b : received_data) {
-                            if (b >= (byte) 0x20 && b < (byte) 0x7f) {
-                                if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                                    terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) b));
+                    case terminal_sendString:
+                        Platform.runLater(() -> {
+                            for (byte b : received_data) {
+                                if (b >= (byte) 0x20 && b < (byte) 0x7f) {
+                                    if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                                        terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) b));
+                                    } else {
+                                        terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) b));
+                                    }
+                                } else if (b == (byte) 0x0a) {
+                                    terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
+                                } else if (b == (byte) 0x0d) {
+                                    String s = "";
+                                    if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                                        for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
+                                    } else {
+                                        for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
+                                            s = s.concat(" ");
+                                    }
+                                    terminalTextArea.appendText(s);
+                                } else if (b == (byte) 0x08) {
+                                    terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
+                                }
+                            }
+                        });
+                        break;
+                    case terminal_readRequest:
+                        synchronized (lock) {
+                            while (charInList.isEmpty()) {
+                                lock.wait();
+                            }
+                        }
+                        byte[] data = new byte[(charInList.size()%Packet.maxPacketDimension)];
+                        for (int i=0;i<data.length;i++) {
+                            data[i]= (byte) charInList.remove().charValue();
+                        }
+                        serialChannel.sendPacket(new Packet(false, terminal_readRequest, data, PacketType.fast));
+                        break;
+                    case disk_getInformation:
+                        //returns disk status
+                        // data[0] = inserted(7) + ready(6) + read only (5) + transfer error (4) + seek error (3) + ...
+                        if (diskEmulationOn) {
+                            byte[] response = new byte[6];
+                            response[0] = disk_insertedMask | disk_readyMask;
+                            if (disk.isReadOnly()) {
+                                response[0] = (byte) (response[0] | disk_readOnlyMask);
+                            }
+                            if (sectorTransferError) {
+                                response[0] = (byte) (response[0] | disk_dataTransferErrorMask);
+                            }
+                            if (sectorSeekError) {
+                                response[0] = (byte) (response[0] | disk_seekErrorMask);
+                            }
+                            // if disk emulation is on, next bytes contains disk structure
+                            // sector dimension (128 multiple, 1 byte) + sector per track (1 byte) + tracks per head (2 bytes) + heads (1 byte)
+                            response[1] = (byte) (disk.getSectorDimension() / 128);
+                            response[2] = (byte) disk.getSpt();
+                            response[3] = (byte) (disk.getTph() & 0x00ff);
+                            response[4] = (byte) (disk.getTph() & 0xff00);
+                            response[5] = (byte) disk.getHeadNumber();
+                            serialChannel.sendPacket(new Packet(false, disk_getInformation, response,PacketType.slow));
+                        } else {
+                            // if disk emulation is off, response packet contains a single 0x00 byte as body
+                            byte[] response = new byte[1];
+                            response[0] = (byte) 0;
+                            serialChannel.sendPacket(new Packet(false, disk_getInformation, response,PacketType.slow));
+                        }
+                        break;
+
+                    case disk_readSector:
+                        if (diskEmulationOn) {
+                            // if disk emulation is on, slave receive the first packet from master and next sends back all data divided in different packets.
+                            short sector_number = received_data[0];
+                            short track_number = received_data[1];
+                            short head_number = received_data[3];
+                            try {
+                                byte[] sector = disk.readDiskSector(head_number, track_number, sector_number);
+                                for (int byteCounter = Packet.maxPacketDimension; byteCounter < disk.getSectorDimension(); byteCounter = byteCounter + Packet.maxPacketDimension) {
+                                    byte[] buffer = new byte[Packet.maxPacketDimension];
+                                    System.arraycopy(sector, byteCounter - (Packet.maxPacketDimension), buffer, 0, buffer.length);
+                                    serialChannel.sendPacket(new Packet(false, disk_readSector, buffer,PacketType.slow));
+                                }
+                                logTextArea.appendText("Disk read operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
+                            } catch (NullPointerException e) {
+                                serialChannel.sendPacket(new Packet(false, disk_readSector, null,PacketType.slow));
+                                System.out.println("disk read error: " + e.getMessage());
+                            }
+
+                        } else {
+                            // if disk emulation is off or there is a read error, slave respond with a void packet.
+                            serialChannel.sendPacket(new Packet(false, disk_readSector, null,PacketType.slow));
+                        }
+                        break;
+                    case disk_writeSector:
+                        if (diskEmulationOn) {
+                            // the slave receive a first packet with all information
+                            short sector_number = received_data[0];
+                            short track_number = received_data[1];
+                            short head_number = received_data[3];
+
+                            byte[] sector = new byte[disk.getSectorDimension()];
+                            int index = 0;
+                            Packet temp;
+                            // when the slave is ready, it receives all packet with disk data divided in different packets from the master
+                            while (index < disk.getSectorDimension()) {
+                                temp = serialChannel.getPacket(false);
+                                if (temp.getData() != null && temp.getCommand() == disk_writeSector) {
+                                    for (int i = 0; i < Packet.maxPacketDimension; i++) {
+                                        sector[index + i] = temp.getData()[i];
+                                        index++;
+                                    }
                                 } else {
-                                    terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) b));
+                                    break;
                                 }
-                            } else if (b == (byte) 0x0a) {
-                                terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
-                            } else if (b == (byte) 0x0d) {
-                                String s = "";
-                                if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                                    for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
-                                } else {
-                                    for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
-                                        s = s.concat(" ");
-                                }
-                                terminalTextArea.appendText(s);
-                            } else if (b == (byte) 0x08) {
-                                terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
                             }
-                        }
-                    });
-                    break;
-                case terminal_readRequest:
-                    if (!terminalSendQueue.isEmpty()) {
-                        byte[] data=new byte[1];
-                        data[0]=(byte)(terminalSendQueue.remove().charValue());
-                        serialChannel.sendPacket(new Packet(false, terminal_readRequest, data));
-                    }
-                    break;
-                case disk_getInformation:
-                    //returns disk status
-                    // data[0] = inserted(7) + ready(6) + read only (5) + transfer error (4) + seek error (3) + ...
-                    if (diskEmulationOn) {
-                        byte[] response = new byte[6];
-                        response[0] = disk_insertedMask | disk_readyMask;
-                        if (disk.isReadOnly()) {
-                            response[0] = (byte) (response[0] | disk_readOnlyMask);
-                        }
-                        if (sectorTransferError) {
-                            response[0] = (byte) (response[0] | disk_dataTransferErrorMask);
-                        }
-                        if (sectorSeekError) {
-                            response[0] = (byte) (response[0] | disk_seekErrorMask);
-                        }
-                        // if disk emulation is on, next bytes contains disk structure
-                        // sector dimension (128 multiple, 1 byte) + sector per track (1 byte) + tracks per head (2 bytes) + heads (1 byte)
-                        response[1] = (byte) (disk.getSectorDimension() / 128);
-                        response[2] = (byte) disk.getSpt();
-                        response[3] = (byte) (disk.getTph() & 0x00ff);
-                        response[4] = (byte) (disk.getTph() & 0xff00);
-                        response[5] = (byte) disk.getHeadNumber();
-                        serialChannel.sendPacket(new Packet(false, disk_getInformation,response));
-                    } else {
-                        // if disk emulation is off, response packet contains a single 0x00 byte as body
-                        byte[] response = new byte[1];
-                        response[0] = (byte) 0;
-                        serialChannel.sendPacket(new Packet(false, disk_getInformation,response));
-                    }
-                    break;
 
-                case disk_readSector:
-                    if (diskEmulationOn) {
-                        // if disk emulation is on, slave receive the first packet from master and next sends back all data divided in different packets.
-                        short sector_number = received_data[0];
-                        short track_number = received_data[1];
-                        short head_number = received_data[3];
-                        try {
-                            byte[] sector = disk.readDiskSector(head_number, track_number, sector_number);
-                            for (int byteCounter = Packet.dimensionMask; byteCounter < disk.getSectorDimension(); byteCounter = byteCounter + Packet.dimensionMask) {
-                                byte[] buffer = new byte[Packet.dimensionMask];
-                                System.arraycopy(sector, byteCounter-(Packet.dimensionMask), buffer, 0, buffer.length);
-                                serialChannel.sendPacket(new Packet(false, disk_readSector, buffer));
-                            }
-                            logTextArea.appendText("Disk read operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
-                        } catch (NullPointerException e) {
-                            serialChannel.sendPacket(new Packet(false, disk_readSector, null));
-                            System.out.println("disk read error: "+e.getMessage());
+                            disk.writeDiskSector(sector, head_number, track_number, sector_number);
+                            logTextArea.appendText("Disk write operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
                         }
+                        break;
+                }
 
-                    } else {
-                        // if disk emulation is off or there is a read error, slave respond with a void packet.
-                        serialChannel.sendPacket(new Packet(false, disk_readSector, null));
-                    }
-                    break;
-                case disk_writeSector:
-                    if (diskEmulationOn) {
-                        // the slave receive a first packet with all information
-                        short sector_number = received_data[0];
-                        short track_number = received_data[1];
-                        short head_number = received_data[3];
-
-                        byte[] sector = new byte[disk.getSectorDimension()];
-                        int index = 0;
-                        Packet temp;
-                        // when the slave is ready, it receives all packet with disk data divided in different packets from the master
-                        while (index < disk.getSectorDimension()) {
-                            temp = serialChannel.getPacket(false);
-                            if (temp.getData()!=null && temp.getCommand()==disk_writeSector) {
-                                for (int i = 0; i < Packet.dimensionMask; i++) {
-                                    sector[index + i] = temp.getData()[i];
-                                    index++;
-                                }
-                            } else {
-                                break;
-                            }
-                        }
-
-                        disk.writeDiskSector(sector, head_number, track_number, sector_number);
-                        logTextArea.appendText("Disk write operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n");
-                    }
-                    break;
-            }
         }
         serialChannel.close();
         Platform.runLater(() -> connectionLabel.setVisible(false));

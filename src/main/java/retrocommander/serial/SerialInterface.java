@@ -30,8 +30,8 @@ public class SerialInterface {
     private final int baudrate;
     private final int parity;
     private final int flowControl;
-    public final int resendTimeout=500;
-    public final int resendAttempts=3;
+    public final int resendTimeout=750;
+    public final int resendAttempts=5;
     private final SerialPort port;
     private boolean lineBitCount;
     private boolean validBitCount;
@@ -42,6 +42,7 @@ public class SerialInterface {
     private byte[] packetData;
     private boolean timeout;
     private volatile boolean receiving;
+    private boolean opened;
     public SerialInterface(String serialPortName, int stopBits, int baudrate, int parity, int flowControl) throws SerialPortInvalidPortException {
         port=SerialPort.getCommPort(serialPortName);
         this.stopBits=stopBits;
@@ -51,11 +52,12 @@ public class SerialInterface {
         packetByteCount=0;
         packetByteDataCount=0;
         packetHeader=new byte[5];
+        opened=false;
     }
     public void open() throws SerialPortIOException {
         port.setComPortParameters(baudrate,8,stopBits,parity,false);
         port.setFlowControl(flowControl);
-        if (!port.openPort()) throw new SerialPortIOException("Error opening serial device");
+        if (!port.openPort()) throw new SerialPortIOException("Serial device not available");
         lineBitCount=false;
         validBitCount=false;
         port.addDataListener(new SerialPortDataListener() {
@@ -135,12 +137,14 @@ public class SerialInterface {
             }
         });
         port.setDTR();
+        opened=true;
     }
     public void close() {
         synchronized (lock) {
             lock.notifyAll();
             port.clearDTR();
             port.closePort();
+            opened=false;
         }
 
     }
@@ -167,7 +171,7 @@ public class SerialInterface {
                         } else {
                             lock.wait();
                         }
-                        if (packetByteCount == 0) {
+                        if (packetByteCount == 0 && opened==true) {
                             timeout = true;
                             port.clearRTS();
                             throw new SerialPortIOException("Timeout error");

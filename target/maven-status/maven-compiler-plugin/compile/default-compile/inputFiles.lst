@@ -3,6 +3,7 @@ C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\module-info.java
 C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\retrocommander\Application.java
 C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\retrocommander\ConsoleController.java
 C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\serial\Packet.java
+C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\serial\PacketType.java
 C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\serial\SerialInterface.java
 C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\Main.java
 C:\Users\vitto\Documents\GitHub\Retro-Commander\src\main\java\retrocommander\disk_creator\DiskCreator.java

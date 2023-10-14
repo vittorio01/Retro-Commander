@@ -107,9 +107,9 @@
                 <content>
                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                      <children>
-                        <TextArea fx:id="logTextArea" editable="false" layoutX="15.0" layoutY="10.0" prefHeight="250.0" prefWidth="420.0">
+                        <TextArea fx:id="logTextArea" editable="false" layoutX="5.0" layoutY="5.0" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="200.0" prefWidth="300.0" style="-fx-line.spacing: 10px;" AnchorPane.bottomAnchor="5.0" AnchorPane.leftAnchor="5.0" AnchorPane.rightAnchor="5.0" AnchorPane.topAnchor="5.0">
                            <font>
-                              <Font name="Noto Mono" size="13.0" />
+                              <Font size="14.0" />
                            </font>
                            <opaqueInsets>
                               <Insets />

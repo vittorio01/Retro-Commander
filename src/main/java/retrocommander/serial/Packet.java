@@ -25,7 +25,7 @@ public class Packet {
     private static final byte packetCountMask=(byte) 0b01000000;
     private static final byte packetTypeMask=(byte) 0b00100000;
     private static final byte dimensionMask=(byte) 0b00011111;
-    public static final int maxPacketDimension=32;
+    public static final int maxPacketDimension=31;
     private boolean acknowledge;
     private final byte command;
     private byte[] data;

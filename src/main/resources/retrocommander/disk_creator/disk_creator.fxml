@@ -1,23 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.ChoiceBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Spinner?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 
-<AnchorPane xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="retrocommander.disk_creator.DiskCreator">
+<AnchorPane xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1" fx:controller="retrocommander.disk_creator.DiskCreator">
    <children>
       <VBox alignment="CENTER" spacing="15.0">
          <children>
-            <Label fx:id="sectorLabel" contentDisplay="RIGHT" graphicTextGap="9.0" text="Sector Dimension">
+            <Label fx:id="sectorLabel" contentDisplay="RIGHT" graphicTextGap="9.0" prefHeight="25.0" prefWidth="250.0" text="Sector Dimension">
                <graphic>
                   <ChoiceBox fx:id="sectorChoice" prefWidth="125.0" />
                </graphic>
             </Label>
-            <Label fx:id="sptLabel" contentDisplay="RIGHT" graphicTextGap="12.0" prefHeight="24.0" prefWidth="250.0" text="Sectors per track">
+            <Label fx:id="sptLabel" contentDisplay="RIGHT" graphicTextGap="13.0" prefHeight="24.0" prefWidth="250.0" text="Sectors per track">
                <graphic>
                   <Spinner fx:id="sptSpinner" prefWidth="80.0" />
                </graphic>
@@ -27,9 +23,9 @@
                   <Spinner fx:id="tphSpinner" prefWidth="80.0" />
                </graphic>
             </Label>
-            <Label fx:id="headLabel" contentDisplay="RIGHT" graphicTextGap="29.0" prefHeight="24.0" prefWidth="250.0" text="heads number">
+            <Label fx:id="headLabel" contentDisplay="RIGHT" graphicTextGap="25.0" prefHeight="24.0" prefWidth="250.0" text="heads number">
                <graphic>
-                  <Spinner fx:id="headSpinner" prefWidth="80.0" />
+                  <Spinner fx:id="headSpinner" prefHeight="25.0" prefWidth="79.0" />
                </graphic>
             </Label>
             <Button mnemonicParsing="false" onAction="#createDisk" text="Create disk file" />

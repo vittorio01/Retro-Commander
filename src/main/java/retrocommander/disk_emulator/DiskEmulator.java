@@ -86,6 +86,6 @@ public class DiskEmulator {
         return head_number;
     }
     public boolean isReadOnly() {
-        return file.canWrite();
+        return !file.canWrite();
     }
 }

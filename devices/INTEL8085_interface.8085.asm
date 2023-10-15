@@ -75,8 +75,8 @@ serial_packet_disk_heads_number                 .equ    serial_packet_disk_tph+1
 serial_packet_timeout_current_value             .equ    serial_packet_disk_heads_number+2
 
 terminal_input_char_queue_start_address         .equ serial_packet_timeout_current_value+2
-terminal_input_char_queue_end_address           .equ terminal_input_char_queue_end_address+2
-terminal_input_char_queue_number                .equ terminal_input_char_queue_number+2
+terminal_input_char_queue_end_address           .equ terminal_input_char_queue_start_address+2
+terminal_input_char_queue_number                .equ terminal_input_char_queue_end_address+2
 
 terminal_input_char_queue_fixed_space_address   .equ terminal_input_char_queue_number+1
 

@@ -3,7 +3,7 @@ Retro-Commander is a graphical application developed in Java and JavaFX that imp
 This app implements a custom protocol to provide an emulation of all primary I/O interfaces to avoid the necessity of other external hardware like monitors,
 keyboards and hard disk/floppy disks.
 
-# Why this application has been developing?
+# Why this application exists?
 
 In last years, I've made a lot of electronic boards that contain mircoprocessors like Intel 8085 and some I/O devices. There is one in particular that contains basical interfaces to interact with users (PS/2 keyboard interface, a NTSC video card and a floppy disk controller for store data) that need to be tested many times. 
 

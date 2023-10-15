@@ -70,9 +70,9 @@ memory_space_base_address                       .equ $0000
 serial_packet_state                             .equ    memory_space_base_address
 serial_packet_disk_bps                          .equ    serial_packet_state+1
 serial_packet_disk_spt                          .equ    serial_packet_disk_bps+1
-serial_packet_disk_tph                          .equ    serial_packet_disk_spt+2
-serial_packet_disk_heads_number                 .equ    serial_packet_disk_tph+1
-serial_packet_timeout_current_value             .equ    serial_packet_disk_heads_number+2
+serial_packet_disk_tph                          .equ    serial_packet_disk_spt+1
+serial_packet_disk_heads_number                 .equ    serial_packet_disk_tph+2
+serial_packet_timeout_current_value             .equ    serial_packet_disk_heads_number+1
 
 terminal_input_char_queue_start_address         .equ serial_packet_timeout_current_value+2
 terminal_input_char_queue_end_address           .equ terminal_input_char_queue_start_address+2
@@ -97,6 +97,7 @@ function_addresses:             jmp serial_reset_connection         ;this functi
 serial_reset_connection:        push b
                                 push d 
                                 push h 
+                                call serial_line_initialize
 serial_reset_connection_retry:  mvi b,serial_command_reset_connection_byte  
                                 mvi c,0
                                 xra a 

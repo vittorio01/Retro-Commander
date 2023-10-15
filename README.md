@@ -17,7 +17,7 @@ In particular, a transmission of a single packet is made using this order:
 * **start marker**, a byte with a predefined value. It's used by the algorithm to understand if there is an incoming transmission from the receive line.
 * **header**, one byte which contains all general information about the packet.
 * **command**, a byte that indicates a specific value used by the receiver to understand how the packet should be used.
-* **checksum**, a byte used for verify the integrity of the packet.
+* **checksum**, a byte used for verify the integrity of the packet. The checksum is a simple sum of all bytes that compose the entire packet (also start and sop byte).
 * **body**, which contains all data and can assume different dimension (from 0 to 31 bytes).
 * **end marker**, a byte with a predefined value used for identifying the end of the transmitted packet.
 
@@ -27,9 +27,21 @@ The header byte is coded using four different criteria:
 *   **type**, bit 6 used for indicate a slow or a fast packet.
 *   **lenght**, all remaining bits used to identify the dimension of the body of the packet.
 
-**ACK** and **count** are two flags dedicated to the flow control. In particular, a single packer can be transmitted in two different ways:
+**ACK** and **count** are two flags dedicated to the flow control. In particular, a single packer can be transmitted in fast mode or slow mode, in base of the status of the flas **type**. 
 
+![fast_packet](/docs/fast_packet.drawio.png)
 
+A fast packet has always **type** and **ACK flag** flag cleared. In this case, the receiver accepts only all packet with a valid ckecksum and **count** value opposite in relation with the last received packet.   
+
+the transmitter does not require an acknowledgement from the receiver and sometimes packets will be lost. For this motivation, fast packet should be used only for non less important operations like **console char read** or **console char write** that requires the fastest transmission time.
+
+![slow_packet](/docs/slow_packet.drawio.png)
+
+In the other hand, a slow packer requires everytime an acknowledgement from the slave. Whan the transmitter sends a packet, the received checks the checksum and the count bit and sends an empty packet with **ACK=1** and an opposite value of **count**. 
+
+If the transmitter does not receive ACK from the receiver, it resends another time the same packet with the same **count** value and waits again. After 5 attempts, the connection is considered lost.
+
+The receiver, when reads a packet with a wrong **count**, sends an empty acknowledgement packet with the past **count** packet value and drop the received packet.
 
 The protocol connects the external device, considered as a **master**, and the java application, considered as a **slave**. In facts, all control is given to the external device, which can sends or request data from and to the slave. In the other hand, the slave is considered as a normal I/O device that executes all tasks. 
 
@@ -78,6 +90,7 @@ During normal transmission, the byte **command** of all packets should remain th
   ```
   Then, the master sends more packet that contains all entire sector. Next, the master should request information to verify if the slave has received all data correctly.
   
+The algorithm uses RTS and CTS signals of RS232 port to control the flow between master and slave, in order to synchronize both devices.
 
 ## Layout description
 When the appication is launched, the Terminal tab automatically will appear on the screen. In this tab, you can start a communication with your device and interact with a terminal-like interface. This black space, when selected, will automatically transmit all key pressed from the keyboard and print all received characters.

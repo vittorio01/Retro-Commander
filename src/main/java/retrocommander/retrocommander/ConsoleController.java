@@ -30,9 +30,7 @@ public class ConsoleController {
     public static final int stopBits=SerialPort.ONE_STOP_BIT;
 
 
-    public static final int line_dimension=64;
-    public static final int line_tab_number=8;
-
+    public static final int line_dimension=56;
 
     @FXML
     private Button startButton;
@@ -307,7 +305,9 @@ public class ConsoleController {
         sectorSeekError=false;
         sectorTransferError=false;
         allowKey.set(false);
+
         while (serialOn) {
+            try {
                 p = serialChannel.getPacket(false);
                 byte[] received_data = p.getData();
                 switch (p.getCommand()) {
@@ -345,17 +345,8 @@ public class ConsoleController {
                                     } else {
                                         terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) b));
                                     }
-                                } else if (b == (byte) 0x0a) {
-                                    terminalTextArea.positionCaret(terminalTextArea.getLength() - (terminalTextArea.getLength() % line_dimension));
                                 } else if (b == (byte) 0x0d) {
-                                    String s = "";
-                                    if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                                        for (int j = 0; j < line_dimension; j++) s = s.concat(" ");
-                                    } else {
-                                        for (int j = 0; j < (line_dimension - (terminalTextArea.getCaretPosition() % line_dimension)); j++)
-                                            s = s.concat(" ");
-                                    }
-                                    terminalTextArea.appendText(s);
+                                    terminalTextArea.appendText("\n");
                                 } else if (b == (byte) 0x08) {
                                     terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
                                 }
@@ -368,9 +359,9 @@ public class ConsoleController {
                                 lock.wait();
                             }
                         }
-                        byte[] data = new byte[(charInList.size()%Packet.maxPacketDimension)];
-                        for (int i=0;i<data.length;i++) {
-                            data[i]= (byte) charInList.remove().charValue();
+                        byte[] data = new byte[(charInList.size() % Packet.maxPacketDimension)];
+                        for (int i = 0; i < data.length; i++) {
+                            data[i] = (byte) charInList.remove().charValue();
                         }
                         serialChannel.sendPacket(new Packet(false, terminal_readRequest, data, PacketType.fast));
                         break;
@@ -396,11 +387,11 @@ public class ConsoleController {
                             response[3] = (byte) (disk.getTph() & 0x00ff);
                             response[4] = (byte) (disk.getTph() & 0xff00);
                             response[5] = (byte) disk.getHeadNumber();
-                            serialChannel.sendPacket(new Packet(false, disk_getInformation, response,PacketType.slow));
+                            serialChannel.sendPacket(new Packet(false, disk_getInformation, response, PacketType.slow));
                         } else {
                             // if disk emulation is off, response packet contains a single 0x00 byte as body
-                            byte[] response = {0,0,0,0,0,0};
-                            serialChannel.sendPacket(new Packet(false, disk_getInformation, response,PacketType.slow));
+                            byte[] response = {0, 0, 0, 0, 0, 0};
+                            serialChannel.sendPacket(new Packet(false, disk_getInformation, response, PacketType.slow));
                         }
                         break;
 
@@ -415,17 +406,17 @@ public class ConsoleController {
                                 for (int byteCounter = 0; byteCounter < disk.getSectorDimension(); byteCounter = byteCounter + disk_packet_dimension) {
                                     byte[] buffer = new byte[disk_packet_dimension];
                                     System.arraycopy(sector, byteCounter, buffer, 0, buffer.length);
-                                    serialChannel.sendPacket(new Packet(false, disk_readSector, buffer,PacketType.slow));
+                                    serialChannel.sendPacket(new Packet(false, disk_readSector, buffer, PacketType.slow));
                                 }
                                 Platform.runLater(() -> logTextArea.appendText("Disk read operation: sector=" + sector_number + " track=" + track_number + " head=" + head_number + "\n"));
                             } catch (NullPointerException e) {
-                                serialChannel.sendPacket(new Packet(false, disk_readSector, null,PacketType.slow));
+                                serialChannel.sendPacket(new Packet(false, disk_readSector, null, PacketType.slow));
                                 System.out.println("disk read error: " + e.getMessage());
                             }
 
                         } else {
                             // if disk emulation is off or there is a read error, slave respond with a void packet.
-                            serialChannel.sendPacket(new Packet(false, disk_readSector, null,PacketType.slow));
+                            serialChannel.sendPacket(new Packet(false, disk_readSector, null, PacketType.slow));
                         }
                         break;
                     case disk_writeSector:
@@ -448,7 +439,7 @@ public class ConsoleController {
                                     }
                                 }
                             }
-                            if (index<disk.getSectorDimension()) {
+                            if (index < disk.getSectorDimension()) {
                                 throw new SerialPortIOException("Sector partially received");
                             }
                             disk.writeDiskSector(sector, head_number, track_number, sector_number);
@@ -456,6 +447,13 @@ public class ConsoleController {
                         }
                         break;
                 }
+            } catch (SerialPortIOException e) {
+                if (!e.getMessage().equals("All resend attempts consumed")) {
+                    serialChannel.close();
+                    Platform.runLater(() -> connectionLabel.setVisible(false));
+                    throw e;
+                }
+            }
 
         }
         serialChannel.close();

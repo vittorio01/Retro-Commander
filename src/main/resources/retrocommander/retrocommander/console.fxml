@@ -16,7 +16,7 @@
                      <children>
                         <VBox>
                            <children>
-                              <TextArea fx:id="terminalTextArea" editable="false" onKeyTyped="#sendCharacter" prefHeight="230.0" prefWidth="450.0" styleClass="terminalTextArea" stylesheets="@../../fonts/terminal.css" wrapText="true">
+                              <TextArea fx:id="terminalTextArea" editable="false" onKeyTyped="#sendCharacter" prefHeight="230.0" prefWidth="450.0" styleClass="terminalTextArea" stylesheets="@../../fonts/terminal.css">
                                  <font>
                                     <Font name="JetBrains Mono ExtraBold" size="14.0" />
                                  </font>

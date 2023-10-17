@@ -30,7 +30,7 @@ public class SerialInterface {
     private final int baudrate;
     private final int parity;
     private final int flowControl;
-    public final int resendTimeout=750;
+    public final int resendTimeout=200;
     public final int resendAttempts=5;
     private final SerialPort port;
     private boolean lineBitCount;
@@ -315,7 +315,7 @@ public class SerialInterface {
             System.out.println("---> packet sent to master: "+p);
         } else {
             port.writeBytes(buffer, 5);
-            System.out.println("ACK sent to master "+lineBitCount);
+            System.out.println("ACK sent to master (count="+lineBitCount+")");
         }
     }
 }

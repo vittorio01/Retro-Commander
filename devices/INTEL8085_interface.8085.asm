@@ -288,6 +288,12 @@ serial_request_disk_sector_loop:        mvi a,$ff
                                         mov a,c
                                         ora a 
                                         jz serial_request_disk_sector_loop_fail
+                                        mov a,l 
+                                        add c 
+                                        mov l,a 
+                                        mov a,h 
+                                        aci 0 
+                                        mov h,a 
                                         mov a,e 
                                         sub c 
                                         mov e,a 
@@ -297,12 +303,6 @@ serial_request_disk_sector_loop:        mvi a,$ff
                                         jc serial_request_disk_sector_loop_end 
                                         ora e 
                                         jz serial_request_disk_sector_loop_end 
-                                        mov a,l 
-                                        add c 
-                                        mov l,a 
-                                        mov a,h 
-                                        aci 0 
-                                        mov h,a 
                                         jmp serial_request_disk_sector_loop
 serial_request_disk_sector_loop_fail:   stc 
                                         cmc 

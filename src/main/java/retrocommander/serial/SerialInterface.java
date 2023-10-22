@@ -141,10 +141,11 @@ public class SerialInterface {
     }
     public void close() {
         synchronized (lock) {
+            opened=false;
             lock.notifyAll();
             port.clearDTR();
             port.closePort();
-            opened=false;
+
         }
 
     }
@@ -153,7 +154,7 @@ public class SerialInterface {
         timeout=true;
         int previusByteDataCount=-1;
         Packet receivedPacket;
-        while (true) {
+        while (opened) {
             synchronized (lock) {
                 if (timeout) {
                     while (receiving) Thread.onSpinWait();
@@ -171,7 +172,8 @@ public class SerialInterface {
                         } else {
                             lock.wait();
                         }
-                        if (packetByteCount == 0 && opened==true) {
+                        if (!opened) continue;
+                        if (packetByteCount == 0) {
                             timeout = true;
                             port.clearRTS();
                             throw new SerialPortIOException("Timeout error");
@@ -181,19 +183,23 @@ public class SerialInterface {
                         continue;
                     case 1:
                         lock.wait(resendTimeout);
+                        if (!opened) continue;
                         if (packetByteCount == 1) timeout = true;
 
                         continue;
                     case 2:
                         lock.wait(resendTimeout);
+                        if (!opened) continue;
                         if (packetByteCount == 2) timeout = true;
                         continue;
                     case 3:
                         lock.wait(resendTimeout);
+                        if (!opened) continue;
                         if (packetByteCount == 3) timeout = true;
                         continue;
                     case 4:
                         lock.wait(resendTimeout);
+                        if (!opened) continue;
                         if (packetByteCount==4) {
                             if (packetByteDataCount==0) {
                                 timeout=true;
@@ -259,6 +265,8 @@ public class SerialInterface {
 
             }
         }
+        port.clearRTS();
+        throw new SerialPortIOException("Manual close request");
     }
 
     public void sendPacket(Packet p) throws SerialPortIOException {

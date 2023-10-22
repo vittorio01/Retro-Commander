@@ -64,6 +64,7 @@ public class ConsoleController {
     private final Object lock=new Object();
     private ArrayBlockingQueue<Character> charInList;
     private AtomicBoolean allowKey;
+    private DiskEmulator disk;
     @FXML
     public void initialize() {
         allowKey=new AtomicBoolean(false);
@@ -121,11 +122,7 @@ public class ConsoleController {
                 @Override
                 protected Void call() throws Exception {
                     try {
-                        if (diskEmulationOn) {
-                            connect(targetPortCombo.getValue(), baudrateChoice.getValue(), diskEmulationOn, diskEmulationFile.getPath());
-                        } else {
-                            connect(targetPortCombo.getValue(), baudrateChoice.getValue(), diskEmulationOn, null);
-                        }
+                        connect(targetPortCombo.getValue(), baudrateChoice.getValue());
                         return null;
                     } catch (InterruptedException ignored) {
 
@@ -134,14 +131,16 @@ public class ConsoleController {
                             serialChannel.close();
                         }
                         Platform.runLater(() -> {
-                            logTextArea.appendText("Error during communication -> "+e.getMessage()+"\n");
-                            logTextArea.appendText("Connection Closed\n");
-                            connectionLabel.setVisible(true);
-                            connectionLabel.setTextFill(Paint.valueOf("RED"));
+                            Platform.runLater(() -> {
+                                logTextArea.appendText("Error during communication: " + e.getMessage() + "\n");
+                                logTextArea.appendText("Conenction closed \n");
+                                connectionLabel.setVisible(true);
+                                connectionLabel.setTextFill(Paint.valueOf("RED"));
+                            });
+
                         });
                     }
                     Platform.runLater(() -> {
-
                         connectionLabel.setText("Connection closed");
                         startButton.setText("Start Communication");
                         diskCheck.setDisable(false);
@@ -155,7 +154,6 @@ public class ConsoleController {
 
 
         } else {
-
             try {
                 serialChannel.close();
                 serialConnection.interrupt();
@@ -187,7 +185,7 @@ public class ConsoleController {
 
     }
     @FXML
-    private void sendCharacter(KeyEvent event) throws SerialPortIOException {
+    private void sendCharacter(KeyEvent event) {
         synchronized (lock) {
             if (serialOn && event.getEventType()==KeyEvent.KEY_TYPED) {
                 charInList.add(event.getCharacter().charAt(0));
@@ -213,18 +211,25 @@ public class ConsoleController {
             diskCheck.setSelected(false);
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Select disk file");
+            chooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RCDSK disk file","*.rcdsk","*.RCDSK"));
 
             diskEmulationFile=chooser.showOpenDialog(new Stage());
             if (diskEmulationFile!=null && diskEmulationFile.exists()) {
-                diskEmulationOn=true;
-                diskCheck.setSelected(true);
+                try {
+                    disk = new DiskEmulator();
+                    disk.bindDiskFile(diskEmulationFile.getPath());
+                    diskEmulationOn=true;
+                    diskCheck.setSelected(true);
+                } catch (Exception e) {
+                    diskCheck.setSelected(false);
+                    diskEmulationOn = false;
+                }
             } else {
                 diskCheck.setSelected(false);
             }
 
         } else {
             diskEmulationOn=false;
-
             diskCheck.setSelected(false);
         }
         diskEmulationSelecting=false;
@@ -291,14 +296,7 @@ public class ConsoleController {
     public static final int disk_packet_dimension=16;
     boolean sectorTransferError;
     boolean sectorSeekError;
-    private void connect(String serialPortName, int baudrate, boolean bindDisk, String diskFile) throws Exception {
-
-        DiskEmulator disk=null;
-        if (bindDisk) {
-            disk=new DiskEmulator(diskFile);
-            disk.bindDiskFile(diskEmulationFile.getPath());
-        }
-        diskEmulationOn=bindDisk;
+    private void connect(String serialPortName, int baudrate) throws Exception {
         serialChannel = new SerialInterface(serialPortName, ConsoleController.stopBits,baudrate, ConsoleController.parity, ConsoleController.flowControl);
         serialChannel.open();
         Platform.runLater(() -> logTextArea.appendText("Serial device opened Correctly!\n"));
@@ -314,7 +312,7 @@ public class ConsoleController {
                 switch (p.getCommand()) {
                     case control_resetConnection:
                         Platform.runLater(() -> {
-                            logTextArea.setText("Connection Reset\n");
+                            logTextArea.appendText("Connection Reset\n");
                             connectionLabel.setVisible(true);
                             connectionLabel.setTextFill(Paint.valueOf("BLACK"));
                             connectionLabel.setText("Connected: unknown");

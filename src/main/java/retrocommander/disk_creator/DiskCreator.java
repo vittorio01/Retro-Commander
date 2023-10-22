@@ -48,6 +48,7 @@ public class DiskCreator {
         if (checkDiskCreation()) {
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Select disk file path");
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("RCDSK disk files","*.rcdsk","*.RCDSK"));
             File createdFile = chooser.showSaveDialog(new Stage());
             short sectorDimension=0;
             for (int i=0;i<sectorDimensions.length;i++) {

@@ -155,8 +155,9 @@ public class ConsoleController {
 
 
         } else {
-            serialChannel.close();
+
             try {
+                serialChannel.close();
                 serialConnection.interrupt();
             } catch (Exception ignored) {}
             serialOn=false;
@@ -313,7 +314,7 @@ public class ConsoleController {
                 switch (p.getCommand()) {
                     case control_resetConnection:
                         Platform.runLater(() -> {
-                            logTextArea.setText("The external device has started a new connection!\n");
+                            logTextArea.setText("Connection Reset\n");
                             connectionLabel.setVisible(true);
                             connectionLabel.setTextFill(Paint.valueOf("BLACK"));
                             connectionLabel.setText("Connected: unknown");
@@ -329,7 +330,6 @@ public class ConsoleController {
                             }
                         }
                         Platform.runLater(() -> {
-                            logTextArea.appendText("The external device has sent his ID: " + boardid + "\n");
                             connectionLabel.setVisible(true);
                             connectionLabel.setTextFill(Paint.valueOf("BLACK"));
                             connectionLabel.setText("Connected: " + boardid);
@@ -340,15 +340,16 @@ public class ConsoleController {
                         Platform.runLater(() -> {
                             for (byte b : received_data) {
                                 if (b >= (byte) 0x20 && b < (byte) 0x7f) {
-                                    if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
-                                        terminalTextArea.insertText(terminalTextArea.getCaretPosition(), String.valueOf((char) b));
-                                    } else {
+                                    //*if (terminalTextArea.getCaretPosition() == terminalTextArea.getLength()) {
+                                        terminalTextArea.insertText(terminalTextArea.getLength(), String.valueOf((char) b));
+                                    /*} else {
                                         terminalTextArea.replaceText(terminalTextArea.getCaretPosition(), terminalTextArea.getCaretPosition() + 1, String.valueOf((char) b));
-                                    }
+                                    }*/
                                 } else if (b == (byte) 0x0d) {
                                     terminalTextArea.appendText("\n");
                                 } else if (b == (byte) 0x08) {
-                                    terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
+                                    terminalTextArea.deleteText(terminalTextArea.getLength()-1,terminalTextArea.getLength());
+                                    //terminalTextArea.deleteText(terminalTextArea.getCaretPosition() - 1, terminalTextArea.getCaretPosition());
                                 }
                             }
                         });

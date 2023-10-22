@@ -60,7 +60,7 @@ public class DiskEmulator {
         filestream=new RandomAccessFile(file,"r");
         byte[] sectorData=new byte[sector_dimension];
         filestream=new RandomAccessFile(file,"r");
-        filestream.seek((sector_dimension*sector)+(track*spt_number)+(head*tph_number*spt_number)+16);
+        filestream.seek(((sector_dimension*sector)+((long) track *spt_number*sector_dimension)+((long) head*tph_number*spt_number*sector_dimension)+16));
         filestream.read(sectorData);
         filestream.close();
         return sectorData;
@@ -69,7 +69,7 @@ public class DiskEmulator {
         if (!binded) throw new IOException("File not binded");
         if (head>=head_number || track>=tph_number || sector>=spt_number) throw new IOException("Sector out of bound");
         filestream=new RandomAccessFile(file,"rw");
-        filestream.seek((sector_dimension*sector)+(track*spt_number)+(head*tph_number*spt_number)+16);
+        filestream.seek(((sector_dimension*sector)+((long) track *spt_number*sector_dimension)+((long) head*tph_number*spt_number*sector_dimension)+16));
         filestream.write(sector_data);
         filestream.close();
     }
